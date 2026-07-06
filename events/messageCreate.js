@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 const config = require("../config");
 
 module.exports = {
@@ -113,7 +112,7 @@ module.exports = {
             message.reply("Terjadi error.");
         }
     },
-=======
+
 const config = require("../config");
 
 module.exports = {
@@ -227,5 +226,4 @@ module.exports = {
             message.reply("Terjadi error.");
         }
     },
->>>>>>> 95a57b2088df19726c4d831d6ae1699863e90c31
 };
