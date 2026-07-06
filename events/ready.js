@@ -37,7 +37,7 @@ module.exports = {
                 { type: ActivityType.Watching, name: `${client.commands.size} Commands` },
                 { type: ActivityType.Watching, name: `Ping ${client.ws.ping}ms` },
                 { type: ActivityType.Watching, name: `Uptime ${uptime()}` },
-                { type: ActivityType.Listening, name: "/help" },
+                { type: ActivityType.Listening, name: "!help" },
                 { type: ActivityType.Playing, name: "Game Verse" },
                 { type: ActivityType.Competing, name: "GAME VERSE Tournament" },
                 { type: ActivityType.Watching, name: "discord.gg/gameverse" },
