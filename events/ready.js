@@ -1,115 +1,60 @@
-const config = require("../config");
+const { ActivityType } = require("discord.js");
 
 module.exports = {
-    name: "messageCreate",
+    name: "clientReady",
+    once: true,
+    execute(client) {
+        console.log(`${client.user.tag} berhasil online!`);
 
-    async execute(message, client) {
-        console.log("Pesan diterima:", message.content);
-        if (message.author.bot) return;
+        function greeting() {
+            const hour = new Date().getHours();
+            if (hour >= 5 && hour < 12) return "🌅 Good Morning";
+            if (hour >= 12 && hour < 18) return "☀️ Good Afternoon";
+            if (hour >= 18 && hour < 22) return "🌇 Good Evening";
+            return "🌙 Good Night";
+        }
 
-        // ===============================
-        // AUTO RESPON + AVATAR
-        // ===============================
-        const responses = {
-            "hy sayang": "APA SAYANG ❤️",
-            "hai sayang": "APA SAYANG ❤️",
-            "hi sayang": "APA SAYANG ❤️",
-            "halo sayang": "APA SAYANG ❤️",
+        function uptime() {
+            const total = Math.floor(process.uptime());
+            const d = Math.floor(total / 86400);
+            const h = Math.floor((total % 86400) / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            if (d > 0) return `${d}D ${h}H`;
+            if (h > 0) return `${h}H ${m}M`;
+            return `${m}M`;
+        }
 
-            "hy ganteng": "Apa Cintaku ❤️",
-            "hai ganteng": "Apa Cintaku ❤️",
-            "hi ganteng": "Apa Cintaku ❤️",
-            "halo ganteng": "Apa Cintaku ❤️",
+        let index = 0;
+        const updatePresence = () => {
+            let members = 0;
+            client.guilds.cache.forEach(guild => {
+                members += guild.memberCount;
+            });
 
-            "hy cantik": "Apa Cintaku ❤️",
-            "hai cantik": "Apa Cintaku ❤️",
-            "hi cantik": "Apa Cintaku ❤️",
-            "halo cantik": "Apa Cintaku ❤️",
+            const activities = [
+                { type: ActivityType.Watching, name: `${client.guilds.cache.size} Servers` },
+                { type: ActivityType.Watching, name: `${members.toLocaleString()} Members` },
+                { type: ActivityType.Watching, name: `${client.commands.size} Commands` },
+                { type: ActivityType.Watching, name: `Ping ${client.ws.ping}ms` },
+                { type: ActivityType.Watching, name: `Uptime ${uptime()}` },
+                { type: ActivityType.Listening, name: "/help" },
+                { type: ActivityType.Playing, name: "GTA V Roleplay" },
+                { type: ActivityType.Playing, name: "Roblox" },
+                { type: ActivityType.Playing, name: "Valorant" },
+                { type: ActivityType.Playing, name: "Minecraft" },
+                { type: ActivityType.Playing, name: "Mobile Legends" },
+                { type: ActivityType.Playing, name: "Free Fire" },
+                { type: ActivityType.Competing, name: "GAME VERSE Tournament" },
+                { type: ActivityType.Watching, name: "discord.gg/gameverse" },
+                { type: ActivityType.Playing, name: greeting() },
+            ];
 
-            "peluk": "🤗 Nih dipeyuk duyu~",
-            "cium": "😘 Muachh!!",
-            "pap": "📸 Nih PAP nya 😳",
-            "mana pap": "📸 Nih PAP nya, jangan disimpan lama-lama ya 🥺"
+            client.user.setActivity(activities[index]);
+            index++;
+            if (index >= activities.length) index = 0;
         };
 
-        const lower = message.content.toLowerCase();
-
-        for (const trigger in responses) {
-            if (lower.startsWith(trigger)) {
-
-                const user = message.mentions.users.first();
-
-                if (!user) {
-                    return message.reply({
-                        content: "Tag dulu orangnya ya 😊",
-                        allowedMentions: {
-                            repliedUser: false,
-                        },
-                    });
-                }
-
-                return message.reply({
-                    content: responses[trigger],
-                    files: [
-                        user.displayAvatarURL({
-                            extension: "jpg",
-                            size: 1024,
-                        }),
-                    ],
-                    allowedMentions: {
-                        repliedUser: false,
-                    },
-                });
-            }
-        }
-
-        // ===============================
-        // RESPON SAAT BOT DI-MENTION
-        // ===============================
-        if (message.mentions.has(client.user)) {
-
-            const text = message.content
-                .replace(`<@${client.user.id}>`, "")
-                .replace(`<@!${client.user.id}>`, "")
-                .trim()
-                .toLowerCase();
-
-            if (text === "halo" || text === "hai" || text === "hi") {
-                return message.reply("Halo juga! 👋");
-            }
-
-            if (text === "morning" || text === "pagi") {
-                return message.reply("Morning juga! 🌞");
-            }
-
-            if (text === "assalamualaikum") {
-                return message.reply("Waalaikumsalam warahmatullahi wabarakatuh 🤲");
-            }
-
-            return message.reply("Halo! Ada yang bisa saya bantu? 😊");
-        }
-
-        // ===============================
-        // COMMAND PREFIX
-        // ===============================
-        if (!message.content.startsWith(config.prefix)) return;
-
-        const args = message.content
-            .slice(config.prefix.length)
-            .trim()
-            .split(/ +/);
-
-        const commandName = args.shift().toLowerCase();
-
-        const command = client.commands.get(commandName);
-
-        if (!command) return;
-
-        try {
-            command.execute(message, args);
-        } catch (err) {
-            console.error(err);
-            message.reply("Terjadi error.");
-        }
+        updatePresence();
+        setInterval(updatePresence, 5000);
     },
 };
