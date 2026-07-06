@@ -1,7 +1,7 @@
 module.exports = {
-    name: "avatar",
+    name: "ping",
 
     execute(message) {
-        message.reply(message.author.displayAvatarURL());
+        message.reply("🏓 Pong!");
     },
 };

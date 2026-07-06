@@ -92,6 +92,9 @@ module.exports = {
         // ===============================
         // COMMAND PREFIX
         // ===============================
+        console.log("DEBUG - prefix:", JSON.stringify(config.prefix));
+        console.log("DEBUG - starts with prefix?", message.content.startsWith(config.prefix));
+
         if (!message.content.startsWith(config.prefix)) return;
 
         const args = message.content
@@ -101,14 +104,21 @@ module.exports = {
 
         const commandName = args.shift().toLowerCase();
 
+        console.log("DEBUG - commandName:", commandName);
+        console.log("DEBUG - available commands:", [...client.commands.keys()]);
+
         const command = client.commands.get(commandName);
+
+        console.log("DEBUG - command found?", !!command);
 
         if (!command) return;
 
         try {
+            console.log("DEBUG - executing command...");
             command.execute(message, args);
+            console.log("DEBUG - command executed without throwing");
         } catch (err) {
-            console.error(err);
+            console.error("DEBUG - ERROR:", err);
             message.reply("Terjadi error.");
         }
     },
