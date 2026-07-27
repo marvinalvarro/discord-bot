@@ -1,6 +1,9 @@
 const { EmbedBuilder } = require("discord.js");
 const config = require("../config");
 
+// Ganti ID ini sesuai channel vip-logs / info VIP di server kamu
+const VIP_LOGS_CHANNEL_ID = "1531039427948843110";
+
 // Deskripsi manual buat tiap command (opsional, biar help-nya lebih informatif)
 // Kalau ada command baru yang belum didaftarin di sini, tetep bakal muncul
 // tapi pake deskripsi default.
@@ -31,10 +34,19 @@ module.exports = {
                 `Semua command di bawah ini bisa dipake **semua member**, gratis tanpa syarat apa-apa!\n\n` +
                 `${commandList}\n\n` +
                 `━━━━━━━━━━━━━━━━━━━\n` +
+                `**💬 FUN AUTO-RESPON (tanpa prefix!)**\n` +
+                `Ketik langsung salah satu kata di bawah + tag orangnya, gak perlu prefix ${config.prefix}:\n\n` +
+                `> **hy/hai/hi/halo sayang** @orang — gombalan manis\n` +
+                `> **hy/hai/hi/halo ganteng/cantik** @orang — gombalan manis\n` +
+                `> **peluk** @orang — bot peyukin orangnya\n` +
+                `> **cium** @orang — bot ciumin orangnya\n` +
+                `> **pap / mana pap** @orang — kirim PAP orangnya\n\n` +
+                `Contoh: \`hy sayang @moon\`\n\n` +
+                `━━━━━━━━━━━━━━━━━━━\n` +
                 `**🤖 CHAT SAMA AI (Gemini)**\n` +
                 `Mau ngobrol bebas / nanya-nanya ke bot? Tinggal **mention** bot ini terus tulis pertanyaan lu.\n\n` +
                 `🔒 Fitur ini khusus buat **Server Booster** atau role **VIP** ya! Kalau lu belum booster/VIP, lu tetep bisa pake command-command di atas kok, cuma chat AI bebasnya aja yang di-lock.\n\n` +
-                `Mau akses AI-nya? Boost server ini atau support server ini di logs-vip 😉`
+                `Mau akses AI-nya? Boost server ini atau cek cara dapetin role VIP di <#${VIP_LOGS_CHANNEL_ID}> 😉`
             )
             .setFooter({ text: `Total: ${client.commands.size} command tersedia` });
 
