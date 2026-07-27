@@ -12,8 +12,8 @@ module.exports = {
 
         channel.send(
             `Halo, ${member}! 🎮 Welcome to **Game Verse**! Langsung gas gabung ngobrol aja, gausah malu-malu, warga sini asbun dan open semua kok wkwk.\n\n` +
-            `Oh iya, biar mabar, nongkrongnya aman dan tentram, tolong dibaca dulu yak <#${1526127278621200456}>. ` +
-            `Terus buat lu yang mungkin baru main Discord, bisa cek <#${1531194725854482544}> biar ga bingung. ` +
+            `Oh iya, biar mabar, nongkrongnya aman dan tentram, tolong dibaca dulu yak <#${RULES_CHANNEL_ID}>. ` +
+            `Terus buat lu yang mungkin baru main Discord, bisa cek <#${GUIDE_CHANNEL_ID}> biar ga bingung. ` +
             `Salken dan enjoy di Game Verse! ✨`
         );
     }
