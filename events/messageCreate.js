@@ -1,4 +1,15 @@
 const config = require("../config");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: `Kamu adalah GAME VERSE BOT, bot Discord untuk komunitas gaming Indonesia bernama Game Verse.
+Gaya bicara kamu santai, gaul, pakai bahasa sehari-hari ala anak nongkrong/gamer Indonesia (boleh pakai "lu/gua", singkatan gaul, emoji secukupnya).
+Jawaban kamu singkat aja, maksimal 3-4 kalimat, jangan bertele-tele.
+Kamu TIDAK BISA benar-benar mencarikan jodoh, memberi hadiah asli, atau melakukan aksi di dunia nyata — kalau ada yang minta itu, becandain aja dengan santai, jangan pura-pura bisa.
+Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek channel #rules atau #take-role.`,
+});
 
 module.exports = {
     name: "messageCreate",
@@ -74,6 +85,7 @@ module.exports = {
                 .trim()
                 .toLowerCase();
 
+            // Balasan tetap (cepat, tanpa perlu panggil AI)
             if (text === "halo" || text === "hai" || text === "hi") {
                 return message.reply("Halo juga! 👋");
             }
@@ -86,7 +98,23 @@ module.exports = {
                 return message.reply("Waalaikumsalam warahmatullahi wabarakatuh 🤲");
             }
 
-            return message.reply("Halo! Ada yang bisa saya bantu? 😊");
+            // Kalau nggak ada isi teksnya (cuma mention doang), kasih sapaan singkat
+            if (!text) {
+                return message.reply("Halo! Ada yang bisa gue bantu? Coba tulis pertanyaan lu ya 😊");
+            }
+
+            // Selain itu, lempar ke Gemini AI biar jawabannya sesuai konteks
+            try {
+                await message.channel.sendTyping();
+
+                const result = await model.generateContent(text);
+                const reply = result.response.text().trim();
+
+                return message.reply(reply || "Hmm, gue bingung mau jawab apa nih, coba tanya lagi ya 😅");
+            } catch (err) {
+                console.error("Gagal manggil Gemini API:", err);
+                return message.reply("Waduh, ada gangguan pas mau mikir jawaban 😵 coba lagi bentar ya.");
+            }
         }
 
         // ===============================
