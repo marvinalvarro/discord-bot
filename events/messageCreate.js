@@ -121,7 +121,7 @@ module.exports = {
             // ===============================
             if (!hasVIPAccess(message.member)) {
                 return message.reply(
-                    "🔒 Wah kalo mau ngobrol interaktif kayak gini gua butuh 'power' lebih dulu bro, ini khusus **Server Booster** atau **VIP** ya! Boost server dulu atau dapetin VIP-nya di bio foundernya ya 😉"
+                    "🔒 Wah kalo mau ngobrol interaktif kayak gini gua butuh 'power' lebih dulu bro, ini khusus **Server Booster** atau role **VIP** ya! Boost server dulu atau dapetin role VIP-nya di #take-role 😉"
                 );
             }
 
@@ -174,7 +174,7 @@ module.exports = {
 
         try {
             console.log("DEBUG - executing command...");
-            command.execute(message, args);
+            command.execute(message, args, client);
             console.log("DEBUG - command executed without throwing");
         } catch (err) {
             console.error("DEBUG - ERROR:", err);
