@@ -11,6 +11,18 @@ Kamu TIDAK BISA benar-benar mencarikan jodoh, memberi hadiah asli, atau melakuka
 Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek channel #rules atau #take-role.`,
 });
 
+// ===============================
+// HELPER: Cek akses Booster/VIP
+// ===============================
+function hasVIPAccess(member) {
+    if (!member) return false;
+    const isBooster = member.premiumSince !== null;
+    const isVIP = config.vipRoleId
+        ? member.roles.cache.has(config.vipRoleId)
+        : false;
+    return isBooster || isVIP;
+}
+
 module.exports = {
     name: "messageCreate",
 
@@ -19,7 +31,7 @@ module.exports = {
         if (message.author.bot) return;
 
         // ===============================
-        // AUTO RESPON + AVATAR
+        // AUTO RESPON + AVATAR (GENERAL - semua bisa akses)
         // ===============================
         const responses = {
             "hy sayang": "APA SAYANG ❤️",
@@ -85,7 +97,7 @@ module.exports = {
                 .trim()
                 .toLowerCase();
 
-            // Balasan tetap (cepat, tanpa perlu panggil AI)
+            // Balasan tetap (cepat, tanpa perlu panggil AI) - GENERAL, semua bisa akses
             if (text === "halo" || text === "hai" || text === "hi") {
                 return message.reply("Halo juga! 👋");
             }
@@ -98,9 +110,19 @@ module.exports = {
                 return message.reply("Waalaikumsalam warahmatullahi wabarakatuh 🤲");
             }
 
-            // Kalau nggak ada isi teksnya (cuma mention doang), kasih sapaan singkat
+            // Kalau nggak ada isi teksnya (cuma mention doang), kasih sapaan singkat - GENERAL
             if (!text) {
                 return message.reply("Halo! Ada yang bisa gue bantu? Coba tulis pertanyaan lu ya 😊");
+            }
+
+            // ===============================
+            // MULAI DARI SINI: butuh AI beneran (Gemini)
+            // KHUSUS SERVER BOOSTER / VIP
+            // ===============================
+            if (!hasVIPAccess(message.member)) {
+                return message.reply(
+                    "🔒 Wah kalo mau ngobrol interaktif kayak gini gua butuh 'power' lebih dulu bro, ini khusus **Server Booster** atau **VIP** ya! Boost server dulu atau dapetin VIP-nya di bio foundernya ya 😉"
+                );
             }
 
             // Selain itu, lempar ke Gemini AI biar jawabannya sesuai konteks
@@ -127,7 +149,7 @@ module.exports = {
         }
 
         // ===============================
-        // COMMAND PREFIX
+        // COMMAND PREFIX (GENERAL - semua bisa akses)
         // ===============================
         console.log("DEBUG - prefix:", JSON.stringify(config.prefix));
         console.log("DEBUG - starts with prefix?", message.content.startsWith(config.prefix));
