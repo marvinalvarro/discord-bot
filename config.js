@@ -6,4 +6,5 @@ module.exports = {
     token: process.env.TOKEN,
     prefix: process.env.PREFIX,
     clientId: process.env.CLIENT_ID,
+    vipRoleId: process.env.VIP_ROLE_ID,
 };
