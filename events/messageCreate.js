@@ -3,7 +3,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-flash-latest",
     systemInstruction: `Kamu adalah GAME VERSE BOT, bot Discord untuk komunitas gaming Indonesia bernama Game Verse.
 Gaya bicara kamu santai, gaul, pakai bahasa sehari-hari ala anak nongkrong/gamer Indonesia (boleh pakai "lu/gua", singkatan gaul, emoji secukupnya).
 Jawaban kamu singkat aja, maksimal 3-4 kalimat, jangan bertele-tele.
