@@ -113,7 +113,16 @@ module.exports = {
                 return message.reply(reply || "Hmm, gue bingung mau jawab apa nih, coba tanya lagi ya 😅");
             } catch (err) {
                 console.error("Gagal manggil Gemini API:", err);
-                return message.reply("Waduh, ada gangguan pas mau mikir jawaban 😵 coba lagi bentar ya.");
+
+                // Cek kalau errornya karena limit harian Gemini habis (429)
+                if (err?.status === 429 || err?.message?.includes("Too Many Requests")) {
+                    return message.reply(
+                        "🥱 Waduh, otak AI-ku lagi capek nih! Jatah chat harian udah abis dipake ngobrol sama kalian semua. Istirahat dulu ya, besok kita ngobrol lagi kalau jatahnya udah reset~"
+                    );
+                }
+
+                // Error teknis lainnya (network, bug, dll)
+                return message.reply("hmm otakku lagi ngadat dikit, coba tanya lagi nanti ya 😅");
             }
         }
 
