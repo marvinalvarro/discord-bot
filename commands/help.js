@@ -10,7 +10,7 @@ const VIP_LOGS_CHANNEL_ID = "1531039427948843110";
 const commandDescriptions = {
     ping: "Cek kecepatan respon bot (latency)",
     say: "Bikin bot ngomong sesuai teks yang lu kasih",
-    avatar: "Nampilin foto profil (avatar) member",
+    avatar: "Nampilin foto profil (avatar)",
     panduan: "Buku panduan lengkap seputar server Game Verse",
     help: "Nampilin daftar command ini",
 };
@@ -43,7 +43,7 @@ module.exports = {
                 `> **pap / mana pap** @orang — kirim PAP orangnya\n\n` +
                 `Contoh: \`hy sayang @moon\`\n\n` +
                 `━━━━━━━━━━━━━━━━━━━\n` +
-                `**🤖 CHAT SAMA AI (Gemini)**\n` +
+                `**🤖 CHAT SAMA SAYA (NOVA VERSE)**\n` +
                 `Mau ngobrol bebas / nanya-nanya ke bot? Tinggal **mention** bot ini terus tulis pertanyaan lu.\n\n` +
                 `🔒 Fitur ini khusus buat **Server Booster** atau role **VIP** ya! Kalau lu belum booster/VIP, lu tetep bisa pake command-command di atas kok, cuma chat AI bebasnya aja yang di-lock.\n\n` +
                 `Mau akses AI-nya? Boost server ini atau cek cara dapetin role VIP di <#${VIP_LOGS_CHANNEL_ID}> 😉`
