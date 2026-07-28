@@ -46,7 +46,7 @@ module.exports = {
                 `**🤖 CHAT SAMA SAYA (NOVA VERSE)**\n` +
                 `Mau ngobrol bebas / nanya-nanya ke bot? Tinggal **mention** bot ini terus tulis pertanyaan lu.\n\n` +
                 `🔒 Fitur ini khusus buat **Server Booster** atau role **VIP** ya! Kalau lu belum booster/VIP, lu tetep bisa pake command-command di atas kok, cuma chat AI bebasnya aja yang di-lock.\n\n` +
-                `Mau akses AI-nya? Boost server ini atau cek cara dapetin role VIP di <#${VIP_LOGS_CHANNEL_ID}> 😉`
+                `Mau akses AI-nya? Boost server ini, **atau** donasi VIP di https://saweria.co/marvinalvarro (link juga ada di bio founder @marvinalvarro). Abis transfer, bisa di lihat di <#${VIP_LOGS_CHANNEL_ID}> ya, nanti role VIP bakal di-assign manual sama admin 😉`
             )
             .setFooter({ text: `Total: ${client.commands.size} command tersedia` });
 
