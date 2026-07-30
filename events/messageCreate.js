@@ -121,7 +121,7 @@ module.exports = {
             // ===============================
             if (!hasVIPAccess(message.member)) {
                 return message.reply(
-                    "🔒 Wah kalo mau ngobrol interaktif kayak gini gua butuh 'power' lebih dulu bro, ini khusus **Server Booster** atau role **VIP** ya! Boost server dulu atau dapetin role VIP-nya di #take-role 😉"
+                    `🔒 Wah kalo mau ngobrol interaktif kayak gini gua butuh 'power' lebih dulu bro, ini khusus **Server Booster** atau role **VIP** ya! Boost server dulu atau VIP ya di bio founder, nanti notifnya bakal muncul di <#${config.logsVipChannelId}> 😉`
                 );
             }
 
