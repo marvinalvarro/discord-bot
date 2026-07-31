@@ -59,11 +59,15 @@ async function ensureBanCounterMessage(channel) {
 
 // Dipanggil tiap kali ada auto-ban dari trap channel
 async function incrementBanCounter(channel) {
+    console.log("[BAN COUNTER] Mulai update, DATA_FILE:", DATA_FILE);
     const data = loadData();
+    console.log("[BAN COUNTER] Data sebelum update:", data);
     data.count += 1;
     saveData(data);
+    console.log("[BAN COUNTER] Data sesudah update:", data);
 
     if (!data.messageId) {
+        console.log("[BAN COUNTER] Belum ada messageId, kirim pesan baru.");
         const sent = await channel.send({ embeds: [buildEmbed(data.count)] });
         data.messageId = sent.id;
         saveData(data);
@@ -73,8 +77,9 @@ async function incrementBanCounter(channel) {
     try {
         const msg = await channel.messages.fetch(data.messageId);
         await msg.edit({ embeds: [buildEmbed(data.count)] });
+        console.log("[BAN COUNTER] Berhasil edit pesan messageId:", data.messageId);
     } catch (err) {
-        // pesan lama hilang, kirim ulang
+        console.log("[BAN COUNTER] Gagal fetch/edit pesan lama, kirim baru. Error:", err.message);
         const sent = await channel.send({ embeds: [buildEmbed(data.count)] });
         data.messageId = sent.id;
         saveData(data);
