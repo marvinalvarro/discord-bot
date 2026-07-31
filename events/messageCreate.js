@@ -1,5 +1,6 @@
 const config = require("../config");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { EmbedBuilder } = require("discord.js");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
@@ -10,6 +11,14 @@ Jawaban kamu singkat aja, maksimal 3-4 kalimat, jangan bertele-tele.
 Kamu TIDAK BISA benar-benar mencarikan jodoh, memberi hadiah asli, atau melakukan aksi di dunia nyata — kalau ada yang minta itu, becandain aja dengan santai, jangan pura-pura bisa.
 Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek channel #rules atau #take-role.`,
 });
+
+// ===============================
+// KONFIGURASI AUTO-BAN TRAP CHANNEL
+// ===============================
+const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap, misal #dilarang-chat-disini
+const LOG_CHANNEL_ID = "";       // (opsional) channel buat log ban count, kosongkan "" kalau gak dipakai
+const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
+let banCount = 0;
 
 // ===============================
 // HELPER: Cek akses Booster/VIP
@@ -29,6 +38,41 @@ module.exports = {
     async execute(message, client) {
         console.log("Pesan diterima:", message.content);
         if (message.author.bot) return;
+
+        // ===============================
+        // AUTO-BAN TRAP CHANNEL (paling atas biar dicek duluan)
+        // ===============================
+        if (message.channelId === TRAP_CHANNEL_ID) {
+            try {
+                await message.delete().catch(() => {});
+
+                const member = message.member;
+                if (member && member.bannable) {
+                    await member.ban({ reason: BAN_REASON });
+                    banCount++;
+
+                    console.log(`[AUTO-BAN] ${message.author.tag} (${message.author.id}) di-ban. Total: ${banCount}`);
+
+                    if (LOG_CHANNEL_ID) {
+                        const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+                        if (logChannel) {
+                            const embed = new EmbedBuilder()
+                                .setColor(0xE74C3C)
+                                .setTitle("🔨 Auto-Ban Triggered")
+                                .setDescription(`**User:** ${message.author.tag} (${message.author.id})\n**Alasan:** ${BAN_REASON}`)
+                                .setFooter({ text: `Total bans: ${banCount}` })
+                                .setTimestamp();
+                            logChannel.send({ embeds: [embed] }).catch(() => {});
+                        }
+                    }
+                } else {
+                    console.log(`Tidak bisa ban ${message.author.tag} — mungkin role bot lebih rendah, atau target admin/owner.`);
+                }
+            } catch (err) {
+                console.error("Gagal auto-ban:", err);
+            }
+            return; // stop, jangan lanjut ke logic lain
+        }
 
         // ===============================
         // AUTO RESPON + AVATAR (GENERAL - semua bisa akses)
