@@ -19,6 +19,7 @@ Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek c
 const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
 const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
 const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
+const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban walau chat di trap channel
 let banCount = 0;
 
 // ===============================
@@ -44,6 +45,12 @@ module.exports = {
         // AUTO-BAN TRAP CHANNEL (paling atas biar dicek duluan)
         // ===============================
         if (message.channelId === TRAP_CHANNEL_ID) {
+            // Founder/whitelist: dibiarkan aja, gak dihapus & gak di-ban
+            if (WHITELIST_USER_IDS.includes(message.author.id)) {
+                console.log(`[WHITELIST] ${message.author.tag} bebas chat di trap channel.`);
+                return;
+            }
+
             try {
                 await message.delete().catch(() => {});
 
