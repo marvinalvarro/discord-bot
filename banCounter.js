@@ -31,7 +31,7 @@ function buildEmbed(count) {
         .setDescription(
             `${SUBTITLE}\n\n**${DESC_ID}**\n\n${DESC_EN}\n\n${FOOTER_TEXT}`
         )
-        .addFields({ name: "\u200b", value: `🔥 **Bans count:** ${count}` });
+        .addFields({ name: "\u200b", value: `🔨 **Bans count:** ${count}` });
 }
 
 // Dipanggil sekali waktu bot ready, mastiin pesan pembuka ada di channel trap
