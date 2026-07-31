@@ -2,7 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const { EmbedBuilder } = require("discord.js");
 
-const DATA_FILE = path.join(__dirname, "..", "banCounterData.json");
+// Kalau Railway Volume ter-mount di /data, pakai itu (permanen, gak ke-reset tiap deploy).
+// Kalau jalan di lokal (gak ada folder /data), fallback ke folder project biasa.
+const VOLUME_PATH = "/data";
+const DATA_FILE = fs.existsSync(VOLUME_PATH)
+    ? path.join(VOLUME_PATH, "banCounterData.json")
+    : path.join(__dirname, "..", "banCounterData.json");
 
 // ==== KONFIGURASI TEKS PESAN ====
 const TITLE = "JANGAN MENGIRIM PESAN DI CHANNEL INI";
