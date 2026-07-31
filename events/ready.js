@@ -1,11 +1,30 @@
 const { ActivityType } = require("discord.js");
 const config = require("../config");
+const { ensureBanCounterMessage } = require("../banCounter");
+
+// ID channel trap, HARUS SAMA PERSIS dengan TRAP_CHANNEL_ID di events/messageCreate.js
+const TRAP_CHANNEL_ID = "1532607922431987805";
 
 module.exports = {
     name: "clientReady",
     once: true,
     execute(client) {
         console.log(`${client.user.tag} berhasil online!`);
+
+        // Pastikan pesan pembuka "JANGAN MENGIRIM PESAN..." + Bans count ada di trap channel
+        (async () => {
+            try {
+                const trapChannel = await client.channels.fetch(TRAP_CHANNEL_ID);
+                if (trapChannel) {
+                    await ensureBanCounterMessage(trapChannel);
+                    console.log("Ban counter message dicek/dikirim ke trap channel.");
+                } else {
+                    console.log("Trap channel tidak ditemukan, cek TRAP_CHANNEL_ID di ready.js.");
+                }
+            } catch (err) {
+                console.error("Gagal ensure ban counter message:", err);
+            }
+        })();
 
         function greeting() {
             const hour = new Date().getHours();
