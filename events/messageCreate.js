@@ -177,9 +177,9 @@ module.exports = {
             // KHUSUS SERVER BOOSTER / VIP
             // ===============================
             if (!hasVIPAccess(message.member)) {
-                return message.reply(
-                    `🔒 Wah kalo mau ngobrol interaktif kayak gini gua butuh 'power' lebih dulu bro, ini khusus **Server Booster** atau role **VIP** ya! Boost server dulu atau VIP ya di bio founder, nanti notifnya bakal muncul di <#${config.logsVipChannelId}> 😉`
-                );
+            return message.reply(
+             `🔒 Wah kalo mau ngobrol interaktif kayak gini, gua butuh 'power' lebih dulu bro ini khusus **Server Booster** atau role **VIP** ya!\n\nCukup **VIP 5k** aja, boost server dulu atau order VIP di bio founder. Nanti notifnya bakal muncul di <#${config.logsVipChannelId}> 😉`
+             );
             }
 
             // Selain itu, lempar ke Gemini AI biar jawabannya sesuai konteks
