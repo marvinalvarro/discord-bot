@@ -1,6 +1,7 @@
 const config = require("../config");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { EmbedBuilder } = require("discord.js");
+const { incrementBanCounter } = require("../banCounter");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
@@ -15,8 +16,8 @@ Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek c
 // ===============================
 // KONFIGURASI AUTO-BAN TRAP CHANNEL
 // ===============================
-const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap, misal #dilarang-chat-disini
-const LOG_CHANNEL_ID = "";       // (opsional) channel buat log ban count, kosongkan "" kalau gak dipakai
+const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
+const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
 const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
 let banCount = 0;
 
@@ -52,6 +53,11 @@ module.exports = {
                     banCount++;
 
                     console.log(`[AUTO-BAN] ${message.author.tag} (${message.author.id}) di-ban. Total: ${banCount}`);
+
+                    // Update pesan counter "Bans count" di trap channel
+                    await incrementBanCounter(message.channel).catch((err) => {
+                        console.error("Gagal update ban counter:", err);
+                    });
 
                     if (LOG_CHANNEL_ID) {
                         const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
