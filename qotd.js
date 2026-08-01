@@ -5,7 +5,7 @@ const { EmbedBuilder } = require("discord.js");
 const questions = require("./qotdQuestions");
 
 // ==== KONFIGURASI ====
-const QOTD_CHANNEL_ID = "ISI_CHANNEL_ID_QOTD_DISINI"; // channel tempat QOTD dikirim
+const QOTD_CHANNEL_ID = "1532591715389804635"; // channel tempat QOTD dikirim
 const CRON_TIME = "0 20 * * *"; // jam 8 malam tiap hari
 const TIMEZONE = "Asia/Jakarta";
 
