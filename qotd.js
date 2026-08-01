@@ -59,16 +59,16 @@ async function sendQOTD(client) {
         const embed = new EmbedBuilder()
             .setColor(0xF1A33C)
             .setDescription(
-                `❓ **Pertanyaan Asbun Hari Ini**\n\n` +
-                `Halo warga! Udah masuk hari **${tanggal}** nih, waktunya sesi QOTD biar otak lu pada jalan dikit wkwk. Coba dong *share* jawaban jujur lu di *thread* bawah ini yak 🫣\n\n` +
+                `🎮 **Quest Harian Game Verse**\n\n` +
+                `Gas push, Verser! Udah masuk hari **${tanggal}** nih, saatnya isi quest harian biar makin akrab sama sesama gamer di sini. Share jawaban lu di *thread* bawah ini ya 🔥\n\n` +
                 `» **${question}**\n\n` +
-                `Gas tulis jawaban lu di thread 👇`
+                `Drop jawaban lu di thread 👇`
             );
 
         const sentMessage = await channel.send({ embeds: [embed] });
 
         await sentMessage.startThread({
-            name: `🐾 Jawab di Sini Warga! - ${tanggal}`,
+            name: `🎮 Quest Harian - ${tanggal}`,
             autoArchiveDuration: 1440, // 24 jam
         });
 
