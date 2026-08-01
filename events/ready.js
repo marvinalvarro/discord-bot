@@ -27,11 +27,20 @@ module.exports = {
             }
         })();
 
-        // Jadwalin QOTD (Question of the Day) tiap jam 6 pagi
+        // Jadwalin QOTD (Question of the Day)
         scheduleQOTD(client);
 
+        function getJakartaHour() {
+            const jakartaTimeStr = new Date().toLocaleString("en-US", {
+                timeZone: "Asia/Jakarta",
+                hour: "2-digit",
+                hour12: false,
+            });
+            return parseInt(jakartaTimeStr, 10);
+        }
+
         function greeting() {
-            const hour = new Date().getHours();
+            const hour = getJakartaHour();
             if (hour >= 5 && hour < 12) return "🌅 Good Morning";
             if (hour >= 12 && hour < 18) return "☀️ Good Afternoon";
             if (hour >= 18 && hour < 22) return "🌇 Good Evening";
