@@ -6,7 +6,7 @@ const questions = require("./qotdQuestions");
 
 // ==== KONFIGURASI ====
 const QOTD_CHANNEL_ID = "1532591715389804635"; // channel tempat QOTD dikirim
-const CRON_TIME = "0 6 * * *"; // jam 6 pagi tiap hari
+const CRON_TIME = "0 0 * * *"; // jam 00.00 tiap hari
 const TIMEZONE = "Asia/Jakarta";
 
 const DATA_FILE = path.join(__dirname, "qotdData.json");
@@ -87,7 +87,7 @@ function scheduleQOTD(client) {
         },
         { timezone: TIMEZONE }
     );
-    console.log(`QOTD dijadwalkan tiap jam 6 pagi (${TIMEZONE}).`);
+    console.log(`QOTD dijadwalkan tiap jam 00.00 (${TIMEZONE}).`);
 }
 
 module.exports = { scheduleQOTD, sendQOTD };
