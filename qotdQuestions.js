@@ -1,0 +1,30 @@
+// Daftar pertanyaan QOTD (Question of the Day) - gaya santai/gaul
+// Tambahin/edit bebas sesuai selera komunitas kamu
+
+module.exports = [
+    "Apa ketakutan terbesar lu yang ga masuk akal?",
+    "Lebih milih dapet kerjaan gaji gede tapi stress atau gaji UMR tapi santai banget?",
+    "Apa hal paling random yang pernah lu beli di online shop?",
+    "Kalo lu bisa punya 1 skill dari anime/game apa yang lu pilih?",
+    "Makanan apa yang menurut lu overrated banget?",
+    "Kebiasaan aneh apa yang cuma lu doang yang punya?",
+    "Kalo besok libur tiba-tiba, mau ngapain pertama kali?",
+    "Game apa yang paling bikin lu emosi tapi tetep dimainin?",
+    "Apa lagu yang lu puter terus tanpa bosen akhir-akhir ini?",
+    "Kalo dikasih 100 juta tapi harus abis dalam sehari, mau dipake apa?",
+    "Julukan paling absurd yang pernah lu dapet apa?",
+    "Apa hal terkecil yang bisa bikin mood lu langsung naik?",
+    "Kalo lu jadi karakter di FF/ML, role apa yang lu pilih?",
+    "Barang paling gaje yang masih lu simpen sampe sekarang apa?",
+    "Kalo lu boleh skip satu pelajaran sekolah/kuliah selamanya, pilih apa?",
+    "Apa hal paling absurd yang pernah lu percaya waktu kecil?",
+    "Kalo lu bisa ngobrol sama diri lu 5 tahun lalu, mau bilang apa?",
+    "Snack/jajanan apa yang paling nemenin lu pas mabar?",
+    "Kalo lu punya kekuatan buat freeze waktu 1 jam, mau ngapain?",
+    "Apa drama Discord/komunitas paling absurd yang pernah lu liat?",
+    "Kalo lu bisa ganti nama panggilan lu jadi apa aja, pilih apa?",
+    "Hobi yang pengen banget lu coba tapi belum kesampean apa?",
+    "Kalo lu jadi admin server buat sehari, mau bikin rule apa?",
+    "Apa hal paling annoying pas lagi push rank?",
+    "Kalo lu disuruh milih, mabar sampe pagi atau tidur cukup? kenapa?",
+];
