@@ -1,6 +1,7 @@
 const { ActivityType } = require("discord.js");
 const config = require("../config");
 const { ensureBanCounterMessage } = require("../banCounter");
+const { scheduleQOTD } = require("../qotd");
 
 // ID channel trap, HARUS SAMA PERSIS dengan TRAP_CHANNEL_ID di events/messageCreate.js
 const TRAP_CHANNEL_ID = "1532607922431987805";
@@ -25,6 +26,9 @@ module.exports = {
                 console.error("Gagal ensure ban counter message:", err);
             }
         })();
+
+        // Jadwalin QOTD (Question of the Day) tiap jam 6 pagi
+        scheduleQOTD(client);
 
         function greeting() {
             const hour = new Date().getHours();
