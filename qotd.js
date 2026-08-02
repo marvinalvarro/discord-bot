@@ -88,7 +88,7 @@ function scheduleQOTD(client) {
         },
         { timezone: TIMEZONE }
     );
-    console.log(`QOTD dijadwalkan tiap jam 00.00 (${TIMEZONE}).`);
+    console.log(`QOTD dijadwalkan dengan cron "${CRON_TIME}" (${TIMEZONE}).`);
 }
 
 module.exports = { scheduleQOTD, sendQOTD };
