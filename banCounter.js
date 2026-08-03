@@ -7,7 +7,7 @@ const { EmbedBuilder } = require("discord.js");
 const VOLUME_PATH = "/data";
 const DATA_FILE = fs.existsSync(VOLUME_PATH)
     ? path.join(VOLUME_PATH, "banCounterData.json")
-    : path.join(__dirname, "..", "banCounterData.json");
+    : path.join(__dirname, "banCounterData.json");
 
 // ==== KONFIGURASI TEKS PESAN ====
 const TITLE = "JANGAN MENGIRIM PESAN DI CHANNEL INI";
