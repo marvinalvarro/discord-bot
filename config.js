@@ -8,4 +8,5 @@ module.exports = {
     clientId: process.env.CLIENT_ID,
     vipRoleId: process.env.VIP_ROLE_ID,
     logsVipChannelId: process.env.LOGS_VIP_CHANNEL_ID,
+    levelUpChannelId: process.env.LEVEL_UP_CHANNEL_ID, // <-- channel khusus notif naik level voice
 };

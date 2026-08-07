@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { Client, Collection, GatewayIntentBits } = require("discord.js");
 const config = require("./config");
+const { startVoiceXPLoop } = require("./voiceXP");
 
 const client = new Client({
     intents: [
@@ -11,6 +12,7 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates, // <-- WAJIB ditambah supaya bisa deteksi voice channel
     ],
 });
 
@@ -31,5 +33,10 @@ for (const file of eventFiles) {
     const event = require(`./events/${file}`);
     client.on(event.name, (...args) => event.execute(...args, client));
 }
+
+// Mulai loop pemberian XP voice setelah bot online
+client.once("ready", () => {
+    startVoiceXPLoop(client, config);
+});
 
 client.login(config.token);
