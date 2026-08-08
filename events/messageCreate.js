@@ -2,6 +2,7 @@ const config = require("../config");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { EmbedBuilder } = require("discord.js");
 const { incrementBanCounter } = require("../banCounter");
+const { handleChatMessage } = require("../chatXP");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
@@ -86,6 +87,11 @@ module.exports = {
             }
             return; // stop, jangan lanjut ke logic lain
         }
+
+        // ===============================
+        // XP CHAT (dihitung untuk semua pesan valid di luar trap channel)
+        // ===============================
+        handleChatMessage(message, config);
 
         // ===============================
         // AUTO RESPON + AVATAR (GENERAL - semua bisa akses)

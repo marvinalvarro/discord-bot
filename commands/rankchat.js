@@ -1,5 +1,5 @@
 const { AttachmentBuilder } = require("discord.js");
-const { loadData, getUser, xpNeededForLevel } = require("../voiceXP");
+const { loadData, getUser, xpNeededForLevel } = require("../chatXP");
 const { generateRankCard } = require("../rankCard");
 
 function getLeaderboardRank(data, userId) {
@@ -11,8 +11,8 @@ function getLeaderboardRank(data, userId) {
 }
 
 module.exports = {
-    name: "rank",
-    description: "Cek level & XP voice kamu atau orang lain",
+    name: "rankchat",
+    description: "Cek level & XP chat kamu atau orang lain",
     async execute(message, args, client) {
         const target = message.mentions.users.first() || message.author;
 
@@ -29,10 +29,10 @@ module.exports = {
             level: user.level,
             xp: user.xp,
             xpNeeded: needed,
-            accentColor: "#1ABC9C",
+            accentColor: "#9B59B6",
         });
 
-        const attachment = new AttachmentBuilder(buffer, { name: "rank-voice.png" });
+        const attachment = new AttachmentBuilder(buffer, { name: "rank-chat.png" });
         message.channel.send({ files: [attachment] });
     },
 };
