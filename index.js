@@ -12,7 +12,8 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildVoiceStates, // <-- WAJIB ditambah supaya bisa deteksi voice channel
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessageReactions, // <-- WAJIB ditambah supaya game trivia/tictactoe/blackjack bisa deteksi klik reaction
     ],
 });
 
