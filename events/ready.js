@@ -65,6 +65,7 @@ module.exports = {
             });
 
             const activities = [
+                { type: ActivityType.Playing, name: "Marvin Handsome" },
                 { type: ActivityType.Watching, name: `${client.guilds.cache.size} Servers` },
                 { type: ActivityType.Watching, name: `${members.toLocaleString()} Members` },
                 { type: ActivityType.Watching, name: `${client.commands.size} Commands` },
@@ -72,7 +73,6 @@ module.exports = {
                 { type: ActivityType.Watching, name: `Uptime ${uptime()}` },
                 { type: ActivityType.Listening, name: `${config.prefix}help` },
                 { type: ActivityType.Playing, name: "Game Verse" },
-                { type: ActivityType.Competing, name: "GAME VERSE Tournament" },
                 { type: ActivityType.Watching, name: "discord.gg/gameverse" },
                 { type: ActivityType.Playing, name: greeting() },
             ];

@@ -13,6 +13,9 @@ const commandDescriptions = {
     avatar: "Nampilin foto profil (avatar)",
     panduan: "Buku panduan lengkap seputar server Game Verse",
     help: "Nampilin daftar command ini",
+    rank: "Cek level & XP voice kamu (atau orang lain kalau di-tag)",
+    rankchat: "Cek level & XP chat kamu (atau orang lain kalau di-tag)",
+    voiceleaderboard: "Lihat top 10 user dengan level voice tertinggi",
 };
 
 module.exports = {
@@ -33,6 +36,12 @@ module.exports = {
             .setDescription(
                 `Semua command di bawah ini bisa dipake **semua member**, gratis tanpa syarat apa-apa!\n\n` +
                 `${commandList}\n\n` +
+                `━━━━━━━━━━━━━━━━━━━\n` +
+                `**🏆 SISTEM LEVEL & XP**\n` +
+                `Kamu **otomatis** dapat XP tanpa perlu command apapun:\n\n` +
+                `> 🎙️ **Voice XP** — dapet XP tiap menit selama kamu ada di voice channel\n` +
+                `> 💬 **Chat XP** — dapet XP tiap kirim pesan (ada jeda dikit biar gak spam)\n\n` +
+                `Pas level kamu naik, bakal ada notif otomatis muncul di channel khusus. Cek progress kapan aja pake \`${config.prefix}rank\` (voice) atau \`${config.prefix}rankchat\` (chat).\n\n` +
                 `━━━━━━━━━━━━━━━━━━━\n` +
                 `**💬 FUN AUTO-RESPON (tanpa prefix!)**\n` +
                 `Ketik langsung salah satu kata di bawah + tag orangnya, gak perlu prefix ${config.prefix}:\n\n` +
