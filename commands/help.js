@@ -4,6 +4,9 @@ const config = require("../config");
 // Ganti ID ini sesuai channel vip-logs / info VIP di server kamu
 const VIP_LOGS_CHANNEL_ID = "1531039427948843110";
 
+// Command yang gak mau ditampilin di daftar .help (misal command internal/testing)
+const HIDDEN_COMMANDS = ["testqotd"];
+
 // Deskripsi manual buat tiap command (opsional, biar help-nya lebih informatif)
 // Kalau ada command baru yang belum didaftarin di sini, tetep bakal muncul
 // tapi pake deskripsi default.
@@ -16,6 +19,13 @@ const commandDescriptions = {
     rank: "Cek level & XP voice kamu (atau orang lain kalau di-tag)",
     rankchat: "Cek level & XP chat kamu (atau orang lain kalau di-tag)",
     voiceleaderboard: "Lihat top 10 user dengan level voice tertinggi",
+    balance: "Cek saldo coin kamu (atau orang lain kalau di-tag)",
+    tebakangka: "Tebak angka rahasia 1-100 lewat chat, menang dapat coin",
+    trivia: "Jawab kuis seputar game pakai reaction, bener dapat coin",
+    slot: "Main slot machine, taruhan coin buat menang lebih banyak",
+    blackjack: "Main blackjack lawan bot (dealer), taruhan coin",
+    tictactoe: "Main tic-tac-toe 1v1 lawan orang lain (tag orangnya)",
+    ktp: "Bikin KTP warga Game Verse kamu sendiri",
 };
 
 module.exports = {
@@ -23,6 +33,7 @@ module.exports = {
 
     async execute(message, args, client) {
         const commandList = [...client.commands.keys()]
+            .filter((name) => !HIDDEN_COMMANDS.includes(name))
             .sort()
             .map((name) => {
                 const desc = commandDescriptions[name] || "Belum ada deskripsi";
@@ -42,6 +53,15 @@ module.exports = {
                 `> 🎙️ **Voice XP** — dapet XP tiap menit selama kamu ada di voice channel\n` +
                 `> 💬 **Chat XP** — dapet XP tiap kirim pesan (ada jeda dikit biar gak spam)\n\n` +
                 `Pas level kamu naik, bakal ada notif otomatis muncul di channel khusus. Cek progress kapan aja pake \`${config.prefix}rank\` (voice) atau \`${config.prefix}rankchat\` (chat).\n\n` +
+                `━━━━━━━━━━━━━━━━━━━\n` +
+                `**🎮 GAME & COIN**\n` +
+                `Main game buat ngumpulin **coin** (dimulai dari 100 coin gratis):\n\n` +
+                `> 🔢 **${config.prefix}tebakangka** — tebak angka lewat chat\n` +
+                `> 🧠 **${config.prefix}trivia** — kuis seputar game\n` +
+                `> 🎰 **${config.prefix}slot [taruhan]** — spin buat untung-untungan\n` +
+                `> 🃏 **${config.prefix}blackjack [taruhan]** — lawan dealer bot\n` +
+                `> 🎯 **${config.prefix}tictactoe @lawan** — 1v1 lawan temen\n\n` +
+                `Cek saldo kapan aja pake \`${config.prefix}balance\`. Semua game cuma bisa dimainkan di channel game ya!\n\n` +
                 `━━━━━━━━━━━━━━━━━━━\n` +
                 `**💬 FUN AUTO-RESPON (tanpa prefix!)**\n` +
                 `Ketik langsung salah satu kata di bawah + tag orangnya, gak perlu prefix ${config.prefix}:\n\n` +
