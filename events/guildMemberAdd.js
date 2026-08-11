@@ -6,6 +6,9 @@ const WELCOME_GOODBYE_CHANNEL_ID = "1477885865584885860";
 // ID channel general-chat
 const GENERAL_CHAT_ID = "1520226091107618957";
 
+// ID channel verification
+const VERIFICATION_CHANNEL_ID = "1532578680818237602";
+
 // GIF welcome banner
 const WELCOME_GIF_URL = "https://cdn.discordapp.com/attachments/1391005977393758218/1397859323455078481/3ee9ac3d-671a-4e2a-98a0-c3d4cf9c5aee.gif";
 
@@ -27,6 +30,7 @@ module.exports = {
                     `🎉 Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang!\n\n` +
                     `Di sini tempatnya nongkrong, mabar, dan ngobrol bareng warga yang asik-asik. Jangan malu-malu, langsung aja gaskeun ngobrol di channel yang ada 🔥\n\n` +
                     `Sebelum itu, jangan lupa mampir dulu ke <#${RULES_CHANNEL_ID}> biar tau aturan main di sini, sama <#${GUIDE_CHANNEL_ID}> kalau lu masih baru banget pake Discord.\n\n` +
+                    `Oh iya, jangan lupa verifikasi diri kamu dulu di <#${VERIFICATION_CHANNEL_ID}> biar bisa akses semua channel ya!\n\n` +
                     `Have fun & enjoy the vibe, warga! ✨`
                 )
                 .setThumbnail(member.user.displayAvatarURL({ extension: "png", size: 256 }))
@@ -53,8 +57,7 @@ module.exports = {
             const GUIDE_CHANNEL_ID = "1531194725854482544";
 
             const casualText =
-                `Halo, ${member}! 🎊 Welcome to **Game Verse**! Langsung gas gabung ngobrol aja, gausah malu-malu, warga sini asbun dan open semua kok wkwk.\n\n` +
-                `Oh iya, biar mabar, nongkrongnya aman dan tentram, tolong dibaca dulu yak <#${RULES_CHANNEL_ID}>. Terus buat lu yang mungkin baru main Discord, bisa cek <#${GUIDE_CHANNEL_ID}> biar ga bingung. Salken dan enjoy di Game Verse! ✨`;
+                `Halo, ${member}! 🎊 Welcome to **Game Verse**! Langsung gas gabung ngobrol aja, gausah malu-malu, warga sini asbun dan open semua kok wkwk. Oh iya, biar mabar, nongkrongnya aman dan tentram, tolong dibaca dulu yak <#${RULES_CHANNEL_ID}>. Terus buat lu yang mungkin baru main Discord, bisa cek <#${GUIDE_CHANNEL_ID}> biar ga bingung. Jangan lupa juga verifikasi dulu di <#${VERIFICATION_CHANNEL_ID}> biar akses channel-nya kebuka semua ya! ✨`
 
             try {
                 await generalChannel.send(casualText);
