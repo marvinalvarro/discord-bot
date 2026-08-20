@@ -29,7 +29,9 @@ module.exports = {
                 .setDescription(
                     `🎉 Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang!\n\n` +
                     `Di sini tempatnya nongkrong, mabar, dan ngobrol bareng warga yang asik-asik. Jangan malu-malu, langsung aja gaskeun ngobrol di channel yang ada 🔥\n\n` +
-                    `Sebelum itu, jangan lupa mampir dulu ke <#${RULES_CHANNEL_ID}> biar tau aturan main di sini, sama <#${GUIDE_CHANNEL_ID}> kalau lu masih baru banget pake Discord.\n\n` +
+                    `Sebelum itu, jangan lupa mampir dulu ke:\n` +
+                    `• <#${RULES_CHANNEL_ID}> biar tau aturan main di sini\n` +
+                    `• <#${GUIDE_CHANNEL_ID}> kalau lu masih baru banget pake Discord\n\n` +
                     `Oh iya, jangan lupa verifikasi diri kamu dulu di <#${VERIFICATION_CHANNEL_ID}> biar bisa akses semua channel ya!\n\n` +
                     `Have fun & enjoy the vibe, warga! ✨`
                 )
