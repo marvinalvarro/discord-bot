@@ -1,20 +1,24 @@
 const fs = require("fs");
 const path = require("path");
+const { EmbedBuilder, AttachmentBuilder } = require("discord.js");
+const { generateRankCard } = require("./rankCard");
+const { CHAT_TIERS, syncMemberRole } = require("./rankRoles");
 
 const DATA_PATH = path.join(__dirname, "chatXpData.json");
 
 // ====== KONFIGURASI ======
-const XP_MIN = 5;                  // XP minimum per pesan valid
-const XP_MAX = 10;                 // XP maksimum per pesan valid
-const COOLDOWN_MS = 60 * 1000;     // jeda 60 detik sebelum bisa dapat XP lagi (anti-spam)
-const MIN_MESSAGE_LENGTH = 3;      // pesan di bawah ini gak dihitung (misal "ok", "wkwk" masih dihitung, tapi "." "😂" mepet)
+const XP_MIN = 5;
+const XP_MAX = 10;
+const COOLDOWN_MS = 60 * 1000;
+const MIN_MESSAGE_LENGTH = 3;
 
-// Rumus XP dibutuhkan untuk naik level (sama seperti voice XP, tapi datanya terpisah)
+const EMBED_COLOR = 0x9B59B6;
+const ACCENT_HEX = "#9B59B6";
+
 function xpNeededForLevel(level) {
     return 100 + (level - 1) * 50;
 }
 
-// Cooldown disimpan di memory aja (reset kalau bot restart, gak masalah)
 const cooldowns = new Map();
 
 function loadData() {
@@ -58,10 +62,31 @@ function addXP(data, userId, amount) {
     return { leveledUp, newLevel: user.level, user };
 }
 
-/**
- * Dipanggil dari events/messageCreate.js untuk tiap pesan yang masuk.
- * Otomatis handle cooldown, nambah XP, dan kirim notif kalau naik level.
- */
+async function sendLevelUpCard(channel, author, newLevel, user) {
+    const needed = xpNeededForLevel(newLevel);
+
+    const buffer = await generateRankCard({
+        username: author.username,
+        avatarURL: author.displayAvatarURL({ extension: "png", size: 256 }),
+        level: newLevel,
+        xp: user.xp,
+        xpNeeded: needed,
+        type: "CHAT",
+        accentColor: ACCENT_HEX,
+    });
+
+    const attachment = new AttachmentBuilder(buffer, { name: "levelup-chat.png" });
+
+    const embed = new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setDescription(`💬 <@${author.id}> naik ke **Level Chat ${newLevel}** karena aktif ngobrol!`)
+        .setImage("attachment://levelup-chat.png");
+
+    channel.send({ embeds: [embed], files: [attachment] }).catch((err) =>
+        console.error("[chatXP] Gagal kirim notif level up:", err)
+    );
+}
+
 function handleChatMessage(message, config = {}) {
     if (message.author.bot) return;
     if (!message.guild) return;
@@ -71,13 +96,13 @@ function handleChatMessage(message, config = {}) {
     const now = Date.now();
     const lastTime = cooldowns.get(userId) || 0;
 
-    if (now - lastTime < COOLDOWN_MS) return; // masih cooldown, skip
+    if (now - lastTime < COOLDOWN_MS) return;
 
     cooldowns.set(userId, now);
 
     const data = loadData();
     const amount = Math.floor(Math.random() * (XP_MAX - XP_MIN + 1)) + XP_MIN;
-    const { leveledUp, newLevel } = addXP(data, userId, amount);
+    const { leveledUp, newLevel, user } = addXP(data, userId, amount);
     saveData(data);
 
     if (leveledUp) {
@@ -87,9 +112,11 @@ function handleChatMessage(message, config = {}) {
         const targetChannel = channelId ? message.guild.channels.cache.get(channelId) : message.channel;
 
         if (targetChannel && targetChannel.isTextBased()) {
-            targetChannel
-                .send(`💬 <@${userId}> naik ke **Level Chat ${newLevel}** karena aktif ngobrol!`)
-                .catch((err) => console.error("[chatXP] Gagal kirim notif level up:", err));
+            sendLevelUpCard(targetChannel, message.author, newLevel, user);
+        }
+
+        if (message.member) {
+            syncMemberRole(message.member, newLevel, CHAT_TIERS);
         }
     }
 }

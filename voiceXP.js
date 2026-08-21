@@ -1,5 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { EmbedBuilder, AttachmentBuilder } = require("discord.js");
+const { generateRankCard } = require("./rankCard");
+const { VOICE_TIERS, syncMemberRole } = require("./rankRoles");
 
 const DATA_PATH = path.join(__dirname, "xpData.json");
 
@@ -11,8 +14,9 @@ const IGNORE_BOTS = true;            // bot lain gak dapat XP
 const IGNORE_IF_ALONE = false;       // true = gak dapat XP kalau sendirian di VC
 const IGNORE_IF_MUTED_DEAFENED = false; // true = gak dapat XP kalau self-mute/deaf
 
-// Rumus XP dibutuhkan untuk naik ke level berikutnya
-// level 1 -> 2 butuh 100 XP, level 2 -> 3 butuh 150 XP, dst (naik 50 tiap level)
+const EMBED_COLOR = 0x1ABC9C;
+const ACCENT_HEX = "#1ABC9C";
+
 function xpNeededForLevel(level) {
     return 100 + (level - 1) * 50;
 }
@@ -40,10 +44,6 @@ function getUser(data, userId) {
     return data[userId];
 }
 
-/**
- * Tambah XP ke seorang user, otomatis handle level up.
- * @returns {leveledUp: boolean, newLevel: number, user: object}
- */
 function addXP(data, userId, amount) {
     const user = getUser(data, userId);
     user.xp += amount;
@@ -62,10 +62,31 @@ function addXP(data, userId, amount) {
     return { leveledUp, newLevel: user.level, user };
 }
 
-/**
- * Loop utama: dipanggil tiap CHECK_INTERVAL_MS, mengecek semua voice channel
- * di semua guild bot ini, dan menambah XP untuk member yang eligible.
- */
+async function sendLevelUpCard(channel, member, newLevel, user) {
+    const needed = xpNeededForLevel(newLevel);
+
+    const buffer = await generateRankCard({
+        username: member.displayName,
+        avatarURL: member.displayAvatarURL({ extension: "png", size: 256 }),
+        level: newLevel,
+        xp: user.xp,
+        xpNeeded: needed,
+        type: "VOICE",
+        accentColor: ACCENT_HEX,
+    });
+
+    const attachment = new AttachmentBuilder(buffer, { name: "levelup-voice.png" });
+
+    const embed = new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setDescription(`🎉 <@${member.id}> naik ke **Level ${newLevel}** dari ngobrol di voice channel!`)
+        .setImage("attachment://levelup-voice.png");
+
+    channel.send({ embeds: [embed], files: [attachment] }).catch((err) =>
+        console.error("[voiceXP] Gagal kirim log level up:", err)
+    );
+}
+
 function startVoiceXPLoop(client, config = {}) {
     const logChannelId = config.levelUpChannelId || null;
 
@@ -89,20 +110,19 @@ function startVoiceXPLoop(client, config = {}) {
 
                 members.forEach((member) => {
                     changed = true;
-                    const { leveledUp, newLevel } = addXP(data, member.id, XP_PER_CHECK);
+                    const { leveledUp, newLevel, user } = addXP(data, member.id, XP_PER_CHECK);
 
                     if (leveledUp) {
                         console.log(`[voiceXP] ${member.user.tag} naik ke level ${newLevel}`);
 
-                        // Kirim notifikasi level up ke channel log kalau ada
                         if (logChannelId) {
                             const logChannel = guild.channels.cache.get(logChannelId);
                             if (logChannel && logChannel.isTextBased()) {
-                                logChannel
-                                    .send(`🎉 <@${member.id}> naik ke **Level ${newLevel}** dari ngobrol di voice channel!`)
-                                    .catch((err) => console.error("[voiceXP] Gagal kirim log level up:", err));
+                                sendLevelUpCard(logChannel, member, newLevel, user);
                             }
                         }
+
+                        syncMemberRole(member, newLevel, VOICE_TIERS);
                     }
                 });
             });
