@@ -19,6 +19,14 @@ function xpNeededForLevel(level) {
     return 100 + (level - 1) * 50;
 }
 
+function getLeaderboardRank(data, userId) {
+    const sorted = Object.entries(data).sort(
+        ([, a], [, b]) => b.level - a.level || b.xp - a.xp
+    );
+    const index = sorted.findIndex(([id]) => id === userId);
+    return index === -1 ? sorted.length : index + 1;
+}
+
 const cooldowns = new Map();
 
 function loadData() {
@@ -62,12 +70,13 @@ function addXP(data, userId, amount) {
     return { leveledUp, newLevel: user.level, user };
 }
 
-async function sendLevelUpCard(channel, author, newLevel, user) {
+async function sendLevelUpCard(channel, author, newLevel, user, rank) {
     const needed = xpNeededForLevel(newLevel);
 
     const buffer = await generateRankCard({
         username: author.username,
         avatarURL: author.displayAvatarURL({ extension: "png", size: 256 }),
+        rank,
         level: newLevel,
         xp: user.xp,
         xpNeeded: needed,
@@ -112,7 +121,8 @@ function handleChatMessage(message, config = {}) {
         const targetChannel = channelId ? message.guild.channels.cache.get(channelId) : message.channel;
 
         if (targetChannel && targetChannel.isTextBased()) {
-            sendLevelUpCard(targetChannel, message.author, newLevel, user);
+            const rank = getLeaderboardRank(data, userId);
+            sendLevelUpCard(targetChannel, message.author, newLevel, user, rank);
         }
 
         if (message.member) {
