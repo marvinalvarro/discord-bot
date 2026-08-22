@@ -15,6 +15,42 @@ Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek c
 });
 
 // ===============================
+// RETRY HELPER BUAT GEMINI API
+// ===============================
+// Nyoba ulang otomatis kalau kena error 503 (server Google lagi sibuk),
+// dengan jeda yang makin lama tiap percobaan (exponential backoff).
+const MAX_RETRIES = 2; // total percobaan = 1 (awal) + 2 (retry) = 3x
+const RETRY_DELAY_MS = 2000; // jeda awal 2 detik, dobel tiap retry
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateContentWithRetry(text) {
+    let lastError;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const result = await model.generateContent(text);
+            return result;
+        } catch (err) {
+            lastError = err;
+            const isRetryable = err?.status === 503 || err?.message?.includes("Service Unavailable");
+
+            if (!isRetryable || attempt === MAX_RETRIES) {
+                throw err; // error lain (429, dll) atau udah abis jatah retry, lempar ke luar
+            }
+
+            const delay = RETRY_DELAY_MS * (attempt + 1);
+            console.log(`[Gemini] Kena 503, retry ke-${attempt + 1} dalam ${delay / 1000} detik...`);
+            await sleep(delay);
+        }
+    }
+
+    throw lastError;
+}
+
+// ===============================
 // KONFIGURASI AUTO-BAN TRAP CHANNEL
 // ===============================
 const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
@@ -192,7 +228,7 @@ module.exports = {
             try {
                 await message.channel.sendTyping();
 
-                const result = await model.generateContent(text);
+                const result = await generateContentWithRetry(text);
                 const reply = result.response.text().trim();
 
                 return message.reply(reply || "Hmm, gue bingung mau jawab apa nih, coba tanya lagi ya 😅");
@@ -203,6 +239,13 @@ module.exports = {
                 if (err?.status === 429 || err?.message?.includes("Too Many Requests")) {
                     return message.reply(
                         "🥱 Waduh, otak AI-ku lagi capek nih! Jatah chat harian udah abis dipake ngobrol sama kalian semua. Istirahat dulu ya, besok kita ngobrol lagi kalau jatahnya udah reset~"
+                    );
+                }
+
+                // Kalau masih 503 setelah semua retry gagal
+                if (err?.status === 503 || err?.message?.includes("Service Unavailable")) {
+                    return message.reply(
+                        "😵 Server AI-nya lagi rame banget dipake orang-orang, udah gue coba ulang beberapa kali tapi masih gagal. Coba tanya lagi bentar ya~"
                     );
                 }
 

@@ -5,6 +5,7 @@ const path = require("path");
 const { Client, Collection, GatewayIntentBits } = require("discord.js");
 const config = require("./config");
 const { startVoiceXPLoop } = require("./voiceXP");
+const { startBackupLoop } = require("./dataBackup");
 
 const client = new Client({
     intents: [
@@ -38,6 +39,7 @@ for (const file of eventFiles) {
 // Mulai loop pemberian XP voice setelah bot online
 client.once("ready", () => {
     startVoiceXPLoop(client, config);
+    startBackupLoop();
 });
 
 client.login(config.token);

@@ -4,3 +4,6 @@ node_modules
 xpData.json
 chatXpData.json
 economyData.json
+xpData.backup.json
+chatXpData.backup.json
+economyData.backup.json
