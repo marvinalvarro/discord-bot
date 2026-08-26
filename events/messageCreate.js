@@ -15,10 +15,15 @@ Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek c
 });
 
 // ===============================
+// WHITELIST TESTER AI (bisa akses chat AI walau bukan VIP/Booster)
+// ===============================
+// Ganti/tambah ID di sini buat orang yang perlu akses AI buat testing bug,
+// gak peduli status VIP/Boosternya.
+const AI_TESTER_IDS = ["1015666814325375067"]; // founder
+
+// ===============================
 // RETRY HELPER BUAT GEMINI API
 // ===============================
-// Nyoba ulang otomatis kalau kena error 503 (server Google lagi sibuk),
-// dengan jeda yang makin lama tiap percobaan (exponential backoff).
 const MAX_RETRIES = 2; // total percobaan = 1 (awal) + 2 (retry) = 3x
 const RETRY_DELAY_MS = 2000; // jeda awal 2 detik, dobel tiap retry
 
@@ -38,7 +43,7 @@ async function generateContentWithRetry(text) {
             const isRetryable = err?.status === 503 || err?.message?.includes("Service Unavailable");
 
             if (!isRetryable || attempt === MAX_RETRIES) {
-                throw err; // error lain (429, dll) atau udah abis jatah retry, lempar ke luar
+                throw err;
             }
 
             const delay = RETRY_DELAY_MS * (attempt + 1);
@@ -60,10 +65,13 @@ const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban 
 let banCount = 0;
 
 // ===============================
-// HELPER: Cek akses Booster/VIP
+// HELPER: Cek akses Booster/VIP (atau tester AI)
 // ===============================
 function hasVIPAccess(member) {
     if (!member) return false;
+
+    if (AI_TESTER_IDS.includes(member.id)) return true; // bypass khusus tester
+
     const isBooster = member.premiumSince !== null;
     const isVIP = config.vipRoleId
         ? member.roles.cache.has(config.vipRoleId)
@@ -216,7 +224,7 @@ module.exports = {
 
             // ===============================
             // MULAI DARI SINI: butuh AI beneran (Gemini)
-            // KHUSUS SERVER BOOSTER / VIP
+            // KHUSUS SERVER BOOSTER / VIP (atau tester AI)
             // ===============================
             if (!hasVIPAccess(message.member)) {
             return message.reply(
