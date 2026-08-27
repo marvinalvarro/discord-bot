@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
+const { handleMemberJoin } = require("../inviteTracker");
 
 // Ganti ID channel welcome-goodbye di server kamu
 const WELCOME_GOODBYE_CHANNEL_ID = "1477885865584885860";
@@ -17,6 +18,9 @@ module.exports = {
 
     async execute(member) {
         console.log("[guildMemberAdd] Event triggered untuk member:", member.user.tag);
+
+        // Deteksi invite mana yang kepake, tambahin +1 invite valid ke pengundang
+        handleMemberJoin(member).catch((err) => console.error("[inviteTracker] Error:", err));
 
         const channel = member.guild.channels.cache.get(WELCOME_GOODBYE_CHANNEL_ID);
 

@@ -14,7 +14,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessageReactions, // <-- WAJIB ditambah supaya game trivia/tictactoe/blackjack bisa deteksi klik reaction
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildInvites, // <-- WAJIB buat sistem invite tracking // <-- WAJIB ditambah supaya game trivia/tictactoe/blackjack bisa deteksi klik reaction
     ],
 });
 
