@@ -1,31 +1,27 @@
 const config = require("../config");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Groq = require("groq-sdk");
 const { EmbedBuilder } = require("discord.js");
 const { incrementBanCounter } = require("../banCounter");
 const { handleChatMessage } = require("../chatXP");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
-    systemInstruction: `Kamu adalah GAME VERSE BOT, bot Discord untuk komunitas gaming Indonesia bernama Game Verse.
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const SYSTEM_PROMPT = `Kamu adalah GAME VERSE BOT, bot Discord untuk komunitas gaming Indonesia bernama Game Verse.
 Gaya bicara kamu santai, gaul, pakai bahasa sehari-hari ala anak nongkrong/gamer Indonesia (boleh pakai "lu/gua", singkatan gaul, emoji secukupnya).
 Jawaban kamu singkat aja, maksimal 3-4 kalimat, jangan bertele-tele.
 Kamu TIDAK BISA benar-benar mencarikan jodoh, memberi hadiah asli, atau melakukan aksi di dunia nyata — kalau ada yang minta itu, becandain aja dengan santai, jangan pura-pura bisa.
-Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek channel #rules atau #take-role.`,
-});
+Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek channel #rules atau #take-role.`;
 
 // ===============================
 // WHITELIST TESTER AI (bisa akses chat AI walau bukan VIP/Booster)
 // ===============================
-// Ganti/tambah ID di sini buat orang yang perlu akses AI buat testing bug,
-// gak peduli status VIP/Boosternya.
 const AI_TESTER_IDS = ["1015666814325375067"]; // founder
 
 // ===============================
-// RETRY HELPER BUAT GEMINI API
+// RETRY HELPER BUAT GROQ API
 // ===============================
-const MAX_RETRIES = 2; // total percobaan = 1 (awal) + 2 (retry) = 3x
-const RETRY_DELAY_MS = 2000; // jeda awal 2 detik, dobel tiap retry
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 2000;
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,18 +32,25 @@ async function generateContentWithRetry(text) {
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const result = await model.generateContent(text);
-            return result;
+            const completion = await groq.chat.completions.create({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                    { role: "system", content: SYSTEM_PROMPT },
+                    { role: "user", content: text },
+                ],
+                max_tokens: 300,
+            });
+            return completion.choices[0]?.message?.content?.trim() || "";
         } catch (err) {
             lastError = err;
-            const isRetryable = err?.status === 503 || err?.message?.includes("Service Unavailable");
+            const isRetryable = err?.status === 503 || err?.status === 500;
 
             if (!isRetryable || attempt === MAX_RETRIES) {
                 throw err;
             }
 
             const delay = RETRY_DELAY_MS * (attempt + 1);
-            console.log(`[Gemini] Kena 503, retry ke-${attempt + 1} dalam ${delay / 1000} detik...`);
+            console.log(`[Groq] Kena error server, retry ke-${attempt + 1} dalam ${delay / 1000} detik...`);
             await sleep(delay);
         }
     }
@@ -90,7 +93,6 @@ module.exports = {
         // AUTO-BAN TRAP CHANNEL (paling atas biar dicek duluan)
         // ===============================
         if (message.channelId === TRAP_CHANNEL_ID) {
-            // Founder/whitelist: dibiarkan aja, gak dihapus & gak di-ban
             if (WHITELIST_USER_IDS.includes(message.author.id)) {
                 console.log(`[WHITELIST] ${message.author.tag} bebas chat di trap channel.`);
                 return;
@@ -106,7 +108,6 @@ module.exports = {
 
                     console.log(`[AUTO-BAN] ${message.author.tag} (${message.author.id}) di-ban. Total: ${banCount}`);
 
-                    // Update pesan counter "Bans count" di trap channel
                     await incrementBanCounter(message.channel).catch((err) => {
                         console.error("Gagal update ban counter:", err);
                     });
@@ -129,16 +130,16 @@ module.exports = {
             } catch (err) {
                 console.error("Gagal auto-ban:", err);
             }
-            return; // stop, jangan lanjut ke logic lain
+            return;
         }
 
         // ===============================
-        // XP CHAT (dihitung untuk semua pesan valid di luar trap channel)
+        // XP CHAT
         // ===============================
         handleChatMessage(message, config);
 
         // ===============================
-        // AUTO RESPON + AVATAR (GENERAL - semua bisa akses)
+        // AUTO RESPON + AVATAR
         // ===============================
         const responses = {
             "hy sayang": "APA SAYANG ❤️",
@@ -172,23 +173,16 @@ module.exports = {
                 if (!user) {
                     return message.reply({
                         content: "Tag dulu orangnya ya 😊",
-                        allowedMentions: {
-                            repliedUser: false,
-                        },
+                        allowedMentions: { repliedUser: false },
                     });
                 }
 
                 return message.reply({
                     content: responses[trigger],
                     files: [
-                        user.displayAvatarURL({
-                            extension: "jpg",
-                            size: 1024,
-                        }),
+                        user.displayAvatarURL({ extension: "jpg", size: 1024 }),
                     ],
-                    allowedMentions: {
-                        repliedUser: false,
-                    },
+                    allowedMentions: { repliedUser: false },
                 });
             }
         }
@@ -204,7 +198,6 @@ module.exports = {
                 .trim()
                 .toLowerCase();
 
-            // Balasan tetap (cepat, tanpa perlu panggil AI) - GENERAL, semua bisa akses
             if (text === "halo" || text === "hai" || text === "hi") {
                 return message.reply("Halo juga! 👋");
             }
@@ -217,14 +210,12 @@ module.exports = {
                 return message.reply("Waalaikumsalam warahmatullahi wabarakatuh 🤲");
             }
 
-            // Kalau nggak ada isi teksnya (cuma mention doang), kasih sapaan singkat - GENERAL
             if (!text) {
                 return message.reply("Halo! Ada yang bisa gue bantu? Coba tulis pertanyaan lu ya 😊");
             }
 
             // ===============================
-            // MULAI DARI SINI: butuh AI beneran (Gemini)
-            // KHUSUS SERVER BOOSTER / VIP (atau tester AI)
+            // BUTUH AI (Groq) - KHUSUS VIP/Booster/Tester
             // ===============================
             if (!hasVIPAccess(message.member)) {
             return message.reply(
@@ -232,38 +223,33 @@ module.exports = {
              );
             }
 
-            // Selain itu, lempar ke Gemini AI biar jawabannya sesuai konteks
             try {
                 await message.channel.sendTyping();
 
-                const result = await generateContentWithRetry(text);
-                const reply = result.response.text().trim();
+                const reply = await generateContentWithRetry(text);
 
                 return message.reply(reply || "Hmm, gue bingung mau jawab apa nih, coba tanya lagi ya 😅");
             } catch (err) {
-                console.error("Gagal manggil Gemini API:", err);
+                console.error("Gagal manggil Groq API:", err);
 
-                // Cek kalau errornya karena limit harian Gemini habis (429)
-                if (err?.status === 429 || err?.message?.includes("Too Many Requests")) {
+                if (err?.status === 429) {
                     return message.reply(
-                        "🥱 Waduh, otak AI-ku lagi capek nih! Jatah chat harian udah abis dipake ngobrol sama kalian semua. Istirahat dulu ya, besok kita ngobrol lagi kalau jatahnya udah reset~"
+                        "🥱 Waduh, otak AI-ku lagi capek nih! Jatah chat udah abis dipake ngobrol sama kalian semua. Istirahat dulu ya, coba lagi bentar~"
                     );
                 }
 
-                // Kalau masih 503 setelah semua retry gagal
-                if (err?.status === 503 || err?.message?.includes("Service Unavailable")) {
+                if (err?.status === 503 || err?.status === 500) {
                     return message.reply(
                         "😵 Server AI-nya lagi rame banget dipake orang-orang, udah gue coba ulang beberapa kali tapi masih gagal. Coba tanya lagi bentar ya~"
                     );
                 }
 
-                // Error teknis lainnya (network, bug, dll)
                 return message.reply("hmm otakku lagi ngadat dikit, coba tanya lagi nanti ya 😅");
             }
         }
 
         // ===============================
-        // COMMAND PREFIX (GENERAL - semua bisa akses)
+        // COMMAND PREFIX
         // ===============================
         console.log("DEBUG - prefix:", JSON.stringify(config.prefix));
         console.log("DEBUG - starts with prefix?", message.content.startsWith(config.prefix));
