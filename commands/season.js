@@ -10,9 +10,11 @@ module.exports = {
         const type = (args[1] || "voice").toLowerCase();
 
         if (isNaN(seasonNumber)) {
+            const lastFinishedSeason = currentSeason - 1;
+            const finishedSeasonsText = lastFinishedSeason >= 1 ? `1-${lastFinishedSeason}` : "belum ada";
             return message.reply(
                 `Format: \`.season <nomor> <voice/chat>\`. Contoh: \`.season 1 voice\`\n` +
-                `Season sekarang: **${currentSeason}** (season yang udah selesai: 1-${currentSeason - 1})`
+                `Season sekarang: **${currentSeason}** (season yang udah selesai: ${finishedSeasonsText})`
             );
         }
 
