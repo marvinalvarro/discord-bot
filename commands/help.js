@@ -4,8 +4,8 @@ const config = require("../config");
 // Ganti ID ini sesuai channel vip-logs / info VIP di server kamu
 const VIP_LOGS_CHANNEL_ID = "1531039427948843110";
 
-// Command yang gak mau ditampilin di daftar .help (misal command internal/testing)
-const HIDDEN_COMMANDS = ["testqotd"];
+// Command yang gak mau ditampilin di daftar .help (misal command internal/testing/admin)
+const HIDDEN_COMMANDS = ["testqotd", "resetseason", "crownvoicechampions"];
 
 // Deskripsi manual buat tiap command (opsional, biar help-nya lebih informatif)
 // Kalau ada command baru yang belum didaftarin di sini, tetep bakal muncul
@@ -26,6 +26,8 @@ const commandDescriptions = {
     blackjack: "Main blackjack lawan bot (dealer), taruhan coin",
     tictactoe: "Main tic-tac-toe 1v1 lawan orang lain (tag orangnya)",
     ktp: "Bikin KTP warga Game Verse kamu sendiri",
+    invites: "Cek jumlah invite valid kamu (atau orang lain kalau di-tag)",
+    season: "Lihat leaderboard voice/chat dari season yang udah lewat",
 };
 
 module.exports = {
