@@ -25,7 +25,7 @@ module.exports = {
         const channel = member.guild.channels.cache.get(WELCOME_GOODBYE_CHANNEL_ID);
 
         if (channel) {
-            const RULES_GUIDE_CHANNEL_ID = "1526127278621200456"; // udah digabung, peraturan + panduan jadi satu channel
+            const RULES_GUIDE_CHANNEL_ID = "1544265708920242236"; // udah digabung, peraturan + panduan jadi satu channel
 
             const embed = new EmbedBuilder()
                 .setColor(0x57F287)
@@ -56,7 +56,7 @@ module.exports = {
         console.log("[guildMemberAdd] Cek generalChannel:", generalChannel ? generalChannel.name : "TIDAK DITEMUKAN");
 
         if (generalChannel) {
-            const RULES_GUIDE_CHANNEL_ID = "1526127278621200456"; // udah digabung, peraturan + panduan jadi satu channel
+            const RULES_GUIDE_CHANNEL_ID = "1544265708920242236"; // udah digabung, peraturan + panduan jadi satu channel
 
             const casualText =
                 `Halo, ${member}! 🎊 Welcome to **Game Verse**! Langsung gas gabung ngobrol aja, gausah malu-malu, warga sini asbun dan open semua kok wkwk. Oh iya, biar mabar, nongkrongnya aman dan tentram, tolong dibaca dulu yak <#${RULES_GUIDE_CHANNEL_ID}> (isinya aturan main sekaligus panduan buat yang masih baru main Discord). Jangan lupa juga verifikasi dulu di <#${VERIFICATION_CHANNEL_ID}> biar akses channel-nya kebuka semua ya! ✨`
