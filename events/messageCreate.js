@@ -60,8 +60,10 @@ async function generateContentWithRetry(text) {
 }
 
 // ===============================
-// KONFIGURASI AUTO-BAN TRAP CHANNEL
+// KONFIGURASI AUTO-BAN LINK INVITE DISCORD LAIN
 // ===============================
+const INVITE_LINK_REGEX = /(discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9-]+/i;
+const INVITE_BAN_REASON = "Auto-ban: mengirim link invite server Discord lain (indikasi member poaching)";
 const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
 const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
 const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
@@ -135,6 +137,30 @@ module.exports = {
         }
 
         // ===============================
+        // AUTO-BAN LINK INVITE DISCORD LAIN (berlaku di SEMUA channel)
+        // ===============================
+        if (INVITE_LINK_REGEX.test(message.content)) {
+            if (WHITELIST_USER_IDS.includes(message.author.id)) {
+                console.log(`[WHITELIST] ${message.author.tag} bebas kirim link invite.`);
+            } else {
+                try {
+                    await message.delete().catch(() => {});
+
+                    const member = message.member;
+                    if (member && member.bannable) {
+                        await member.ban({ reason: INVITE_BAN_REASON });
+                        console.log(`[AUTO-BAN INVITE] ${message.author.tag} (${message.author.id}) di-ban karena kirim link invite.`);
+                    } else {
+                        console.log(`Tidak bisa ban ${message.author.tag} (invite link) — mungkin role bot lebih rendah, atau target admin/owner.`);
+                    }
+                } catch (err) {
+                    console.error("Gagal auto-ban invite link:", err);
+                }
+                return;
+            }
+        }
+
+        // ===============================
         // XP CHAT
         // ===============================
         handleChatMessage(message, config);
@@ -158,7 +184,7 @@ module.exports = {
             "hi cantik": "Apa Cintaku ❤️",
             "halo cantik": "Apa Cintaku ❤️",
 
-            "peluk": "🤗 Nih dipeyuk duyu~",
+            "nova pp": "",
             "cium": "😘 Muachh!!",
             "pap": "📸 Nih PAP nya 😳",
             "mana pap": "📸 Nih PAP nya, jangan disimpan lama-lama ya 🥺"
@@ -178,13 +204,18 @@ module.exports = {
                     });
                 }
 
-                return message.reply({
-                    content: responses[trigger],
+                const replyPayload = {
                     files: [
                         user.displayAvatarURL({ extension: "jpg", size: 1024 }),
                     ],
                     allowedMentions: { repliedUser: false },
-                });
+                };
+
+                if (responses[trigger]) {
+                    replyPayload.content = responses[trigger];
+                }
+
+                return message.reply(replyPayload);
             }
         }
 
