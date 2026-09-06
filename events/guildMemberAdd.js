@@ -30,11 +30,11 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor(0x57F287)
                 .setDescription(
-                    `🎉 Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang!\n\n` +
-                    `Di sini tempatnya nongkrong, mabar, dan ngobrol bareng warga yang asik-asik. Jangan malu-malu, langsung aja gaskeun ngobrol di channel yang ada 🔥\n\n` +
+                    `Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang!\n\n` +
+                    `Di sini tempatnya nongkrong, mabar, dan ngobrol bareng warga yang asik-asik. Jangan malu-malu, langsung aja gaskeun ngobrol di channel yang ada\n\n` +
                     `Sebelum itu, jangan lupa mampir dulu ke <#${RULES_GUIDE_CHANNEL_ID}> buat baca aturan main sekaligus panduan lengkap kalau lu masih baru banget pake Discord.\n\n` +
                     `Oh iya, jangan lupa verifikasi diri kamu dulu di <#${VERIFICATION_CHANNEL_ID}> biar bisa akses semua channel ya!\n\n` +
-                    `Have fun & enjoy the vibe, warga! ✨`
+                    `Have fun & enjoy the vibe, warga!`
                 )
                 .setThumbnail(member.user.displayAvatarURL({ extension: "png", size: 256 }))
                 .setImage(WELCOME_GIF_URL)
@@ -56,10 +56,8 @@ module.exports = {
         console.log("[guildMemberAdd] Cek generalChannel:", generalChannel ? generalChannel.name : "TIDAK DITEMUKAN");
 
         if (generalChannel) {
-            const RULES_GUIDE_CHANNEL_ID = "1544265708920242236"; // udah digabung, peraturan + panduan jadi satu channel
-
             const casualText =
-                `Halo, ${member}! 🎊 Welcome to **Game Verse**! Langsung gas gabung ngobrol aja, gausah malu-malu, warga sini asbun dan open semua kok wkwk. Oh iya, biar mabar, nongkrongnya aman dan tentram, tolong dibaca dulu yak <#${RULES_GUIDE_CHANNEL_ID}> (isinya aturan main sekaligus panduan buat yang masih baru main Discord). Jangan lupa juga verifikasi dulu di <#${VERIFICATION_CHANNEL_ID}> biar akses channel-nya kebuka semua ya! ✨`
+                `Welcome, ${member}! Ada muka baru nih di sini. Jangan lupa verif dulu ya, tinggal tekan tombol (reaction) ceklis di <#${VERIFICATION_CHANNEL_ID}>`;
 
             try {
                 await generalChannel.send(casualText);
