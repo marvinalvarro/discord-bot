@@ -49,6 +49,33 @@ const rayainParticipants = loadRayainData();
 // Key: userId (yang lagi ngisi modal), Value: { targetUserId, channelId }
 const pendingUcapan = new Map();
 
+// ===============================
+// DATA PERMANEN BUAT SISTEM ULANG TAHUN OTOMATIS
+// ===============================
+// ID Discord kamu (founder), buat nerima DM notifikasi tiap ada yang daftar ulang tahun.
+// Ganti kalau mau notifikasinya masuk ke akun lain.
+const ADMIN_DM_ID = "1015666814325375067";
+
+const BIRTHDAY_DATA_PATH = path.join(__dirname, "..", "birthdayData.json");
+
+// Format di file: { "<userId>": { day, month, year, username } }
+function loadBirthdayData() {
+    try {
+        const raw = fs.readFileSync(BIRTHDAY_DATA_PATH, "utf8");
+        return JSON.parse(raw);
+    } catch (err) {
+        return {}; // file belum ada / kosong / rusak -> mulai dari kosong
+    }
+}
+
+function saveBirthdayData(data) {
+    try {
+        fs.writeFileSync(BIRTHDAY_DATA_PATH, JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.log("[setultah] Gagal simpan data ulang tahun:", err.message);
+    }
+}
+
 function buildModalStep2() {
     const modal2 = new ModalBuilder()
         .setCustomId("modal_ktp_step2")
@@ -408,6 +435,95 @@ module.exports = {
                 }).catch(() => {});
             } finally {
                 pendingUcapan.delete(interaction.user.id);
+            }
+            return;
+        }
+
+        // ===============================
+        // ===== SISTEM DAFTAR ULANG TAHUN OTOMATIS =====
+        // ===============================
+
+        // ===== Tombol "📅 Daftar Ulang Tahun" diklik -> munculin modal =====
+        if (interaction.isButton() && interaction.customId === "buat_ultah_daftar") {
+            const modal = new ModalBuilder()
+                .setCustomId("modal_ultah_daftar")
+                .setTitle("Daftar Ulang Tahun");
+
+            const tanggalInput = new TextInputBuilder()
+                .setCustomId("tanggalLahir")
+                .setLabel("Tanggal Lahir (format: DD-MM-YYYY)")
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder("17-08-2005")
+                .setRequired(true)
+                .setMaxLength(10);
+
+            modal.addComponents(new ActionRowBuilder().addComponents(tanggalInput));
+
+            try {
+                await interaction.showModal(modal);
+            } catch (err) {
+                console.log("[setultah] Gagal munculin modal daftar ultah:", err.message);
+            }
+            return;
+        }
+
+        // ===== Modal daftar ulang tahun disubmit =====
+        if (interaction.isModalSubmit() && interaction.customId === "modal_ultah_daftar") {
+            const inputTanggal = interaction.fields.getTextInputValue("tanggalLahir").trim();
+
+            // Validasi format DD-MM-YYYY
+            const match = inputTanggal.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+
+            if (!match) {
+                await interaction.reply({
+                    content: "❌ Format tanggal salah. Contoh yang benar: `17-08-2005`",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            const day = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10);
+            const year = parseInt(match[3], 10);
+            const currentYear = new Date().getFullYear();
+
+            const isValidDate =
+                day >= 1 && day <= 31 &&
+                month >= 1 && month <= 12 &&
+                year >= 1900 && year <= currentYear;
+
+            if (!isValidDate) {
+                await interaction.reply({
+                    content: "❌ Tanggal gak valid. Pastikan format DD-MM-YYYY dan tanggalnya masuk akal ya 😅",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            const birthdayData = loadBirthdayData();
+            birthdayData[interaction.user.id] = {
+                day,
+                month,
+                year,
+                username: interaction.user.username,
+            };
+            saveBirthdayData(birthdayData);
+
+            await interaction.reply({
+                content: `✅ Berhasil! Tanggal lahir kamu (**${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}**) udah tersimpan. Bot bakal otomatis ngucapin pas hari-H nanti 🎉`,
+                ephemeral: true,
+            });
+
+            // Kirim DM notifikasi ke admin
+            try {
+                const admin = await client.users.fetch(ADMIN_DM_ID);
+                await admin.send(
+                    `📅 **Pendaftaran Ulang Tahun Baru**\n` +
+                    `User: ${interaction.user} (${interaction.user.username})\n` +
+                    `Tanggal Lahir: ${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`
+                );
+            } catch (err) {
+                console.log("[setultah] Gagal kirim DM notifikasi ke admin:", err.message);
             }
         }
     },

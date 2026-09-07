@@ -6,6 +6,7 @@ const { Client, Collection, GatewayIntentBits } = require("discord.js");
 const config = require("./config");
 const { startVoiceXPLoop } = require("./voiceXP");
 const { startBackupLoop } = require("./dataBackup");
+const { startBirthdayScheduler } = require("./birthdayScheduler");
 
 const client = new Client({
     intents: [
@@ -41,6 +42,7 @@ for (const file of eventFiles) {
 client.once("ready", () => {
     startVoiceXPLoop(client, config);
     startBackupLoop();
+    startBirthdayScheduler(client);
 });
 
 client.login(config.token);
