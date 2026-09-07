@@ -275,7 +275,7 @@ async function generateBirthdayCard({ username, avatarURL, message, userId, from
         ctx.shadowColor = "rgba(0,0,0,0.2)";
         ctx.shadowBlur = 18;
         scallopFramePath(ctx, frameCx, frameCy, frameR, 14, 12);
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = "#FFD700";
         ctx.fill();
         ctx.restore();
 
