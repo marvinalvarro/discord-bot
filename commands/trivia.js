@@ -1,64 +1,52 @@
-const { PermissionsBitField, EmbedBuilder } = require("discord.js");
+const { addCoins } = require("../economy");
+const questions = require("../triviaQuestions");
 
-// Pesan ucapan ulang tahun, dipilih random tiap kali command dipakai
-const BIRTHDAY_MESSAGES = [
-    "Semoga panjang umur, sehat selalu, murah rezeki, dan segala urusannya dilancarkan.",
-    "Semoga di usia yang baru ini diberikan kesehatan, keberkahan, dan kesuksesan dalam segala hal.",
-    "Selamat menempuh usia baru, semoga sehat selalu, panjang umur, dan murah rezeki.",
-    "Semoga senantiasa diberikan kesehatan, kebahagiaan, dan kelancaran rezeki di tahun ini.",
-];
-
-// Beberapa GIF ulang tahun, dipilih random biar gak monoton
-// Catatan: link Discord CDN di bawah ini punya masa berlaku (ada parameter ?ex=...),
-// jadi kalau suatu saat GIF-nya berhenti muncul, upload ulang dan ganti link-nya.
-const BIRTHDAY_GIFS = [
-    "https://cdn.discordapp.com/attachments/1477893248226820188/1546348992441487370/download.gif?ex=6a9f7539&is=6a9e23b9&hm=398a0995e48cbf632bf3118afdbd49b297f676ef12bf4c28f36e80ac79743536&",
-];
+const OPTION_EMOJIS = ["🇦", "🇧", "🇨", "🇩"];
+const REWARD = 25;
+const TIME_LIMIT_MS = 20000;
 
 module.exports = {
-    name: "ultah",
+    name: "trivia",
+    description: "Jawab kuis seputar game, bener dapat coin",
+    async execute(message, args, client) {
+        const q = questions[Math.floor(Math.random() * questions.length)];
 
-    async execute(message) {
-        // Cuma admin/mod yang boleh pakai command ini
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-            return message.reply({
-                content: "Command ini cuma buat admin/mod ya 😊",
-                allowedMentions: { repliedUser: false },
-            });
+        const optionsText = q.options
+            .map((opt, i) => `${OPTION_EMOJIS[i]} ${opt}`)
+            .join("\n");
+
+        const quizMsg = await message.channel.send(
+            `🧠 **TRIVIA TIME!**\n\n**${q.question}**\n\n${optionsText}\n\nReact jawaban lu dalam ${TIME_LIMIT_MS / 1000} detik!`
+        );
+
+        for (let i = 0; i < q.options.length; i++) {
+            await quizMsg.react(OPTION_EMOJIS[i]).catch(() => {});
         }
 
-        const user = message.mentions.users.first();
+        const answeredUsers = new Set();
+        const correctEmoji = OPTION_EMOJIS[q.answer];
 
-        if (!user) {
-            return message.reply({
-                content: "Tag dulu orang yang ulang tahun ya, contoh: `.ultah @user` 🎂",
-                allowedMentions: { repliedUser: false },
-            });
-        }
+        const filter = (reaction, user) => OPTION_EMOJIS.includes(reaction.emoji.name) && !user.bot;
 
-        const randomMessage = BIRTHDAY_MESSAGES[Math.floor(Math.random() * BIRTHDAY_MESSAGES.length)];
-        const randomGif = BIRTHDAY_GIFS[Math.floor(Math.random() * BIRTHDAY_GIFS.length)];
+        const collector = quizMsg.createReactionCollector({ filter, time: TIME_LIMIT_MS });
 
-        const embed = new EmbedBuilder()
-            .setColor(0xFF7AC6)
-            .setTitle("🎂 Happy Birthday! 🎉")
-            .setDescription(`Selamat ulang tahun, ${user}!\n\n${randomMessage}`)
-            .setThumbnail(user.displayAvatarURL({ extension: "jpg", size: 512 }))
-            .setImage(randomGif)
-            .setFooter({ text: `Dari seluruh warga Game Verse untuk ${user.username}` })
-            .setTimestamp();
+        collector.on("collect", async (reaction, user) => {
+            if (answeredUsers.has(user.id)) return;
+            answeredUsers.add(user.id);
 
-        try {
-            return await message.channel.send({
-                embeds: [embed],
-                allowedMentions: { users: [user.id] },
-            });
-        } catch (err) {
-            console.error("[ultah] Gagal kirim pesan ulang tahun:", err.message);
-            return message.reply({
-                content: "Gagal kirim ucapan, kemungkinan bot gak punya izin 'Send Messages'/'Embed Links' di channel ini 😥",
-                allowedMentions: { repliedUser: false },
-            }).catch(() => {});
-        }
+            if (reaction.emoji.name === correctEmoji) {
+                const newBalance = addCoins(user.id, REWARD);
+                message.channel.send(
+                    `✅ **${user.username} jawab bener!** Jawabannya **${q.options[q.answer]}**. +${REWARD} coin 🪙 (saldo: ${newBalance})`
+                );
+                collector.stop("answered");
+            }
+        });
+
+        collector.on("end", (collected, reason) => {
+            if (reason !== "answered") {
+                message.channel.send(`⏰ Waktu habis! Jawaban yang bener adalah **${q.options[q.answer]}**.`);
+            }
+        });
     },
 };
