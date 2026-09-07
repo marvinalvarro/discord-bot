@@ -8,7 +8,7 @@ const BIRTHDAY_DATA_PATH = path.join(__dirname, "birthdayData.json");
 // ===============================
 // GANTI ID CHANNEL INI sesuai channel tempat ucapan ulang tahun otomatis mau dikirim
 // ===============================
-const BIRTHDAY_CHANNEL_ID = "1529480671800852500";
+const BIRTHDAY_CHANNEL_ID = "1531332595336482917";
 
 function loadBirthdayData() {
     try {
