@@ -1,25 +1,10 @@
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, AttachmentBuilder } = require("discord.js");
-const { generateCakeIcon } = require("../cakeIconGenerator");
+const { generateSetultahCard } = require("../setultahCardGenerator");
 
 module.exports = {
     name: "setultah",
 
     async execute(message) {
-        const embed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle("🎂 Daftar Ulang Tahun Kamu")
-            .setDescription(
-                "Daftarin tanggal lahir kamu sekali aja, dan biarkan bot yang inget-inget buat kamu! 🎉\n\n" +
-                "Pas hari ulang tahun kamu tiba, bot bakal otomatis kirim kartu ucapan + GIF spesial ke channel ulang tahun server ini."
-            )
-            .addFields(
-                { name: "📋 Cara Daftar", value: "Klik tombol **Daftar Ulang Tahun** di bawah, lalu isi form yang muncul.", inline: false },
-                { name: "📅 Format Tanggal", value: "`DD-MM-YYYY`\ncontoh: `17-08-2005`", inline: false }
-            )
-            .setThumbnail("attachment://cake_icon.png")
-            .setFooter({ text: "Game Verse • Sistem Ulang Tahun Otomatis" })
-            .setTimestamp();
-
         const button = new ButtonBuilder()
             .setCustomId("buat_ultah_daftar")
             .setLabel("📅 Daftar Ulang Tahun")
@@ -27,15 +12,21 @@ module.exports = {
 
         const row = new ActionRowBuilder().addComponents(button);
 
-        let files = [];
         try {
-            const iconBuffer = generateCakeIcon();
-            files = [new AttachmentBuilder(iconBuffer, { name: "cake_icon.png" })];
-        } catch (err) {
-            console.log("[setultah] Gagal generate ikon kue, lanjut tanpa thumbnail:", err.message);
-            embed.setThumbnail(null);
-        }
+            const cardBuffer = generateSetultahCard();
+            const attachment = new AttachmentBuilder(cardBuffer, { name: "setultah_card.png" });
 
-        await message.reply({ embeds: [embed], components: [row], files });
+            const embed = new EmbedBuilder()
+                .setColor(0x4C6EF5)
+                .setImage("attachment://setultah_card.png");
+
+            await message.reply({ embeds: [embed], files: [attachment], components: [row] });
+        } catch (err) {
+            console.error("[setultah] Gagal generate poster daftar ultah:", err.message);
+            await message.reply({
+                content: "🎂 **Daftar Ulang Tahun Kamu**\nKlik tombol di bawah buat daftarin tanggal lahir kamu.",
+                components: [row],
+            }).catch(() => {});
+        }
     },
 };
