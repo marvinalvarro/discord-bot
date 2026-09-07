@@ -62,14 +62,14 @@ async function checkAndSendBirthdays(client) {
  * startBirthdayScheduler(client);
  */
 function startBirthdayScheduler(client) {
-    // Jalan tiap hari jam 08:00 pagi waktu Jakarta
-    cron.schedule("0 8 * * *", () => {
+    // Jalan tiap hari jam 00:00 tengah malam waktu Jakarta
+    cron.schedule("0 0 * * *", () => {
         checkAndSendBirthdays(client);
     }, {
         timezone: "Asia/Jakarta",
     });
 
-    console.log("[birthdayScheduler] Pengecekan ulang tahun otomatis dijadwalkan tiap jam 08:00 (Asia/Jakarta).");
+    console.log("[birthdayScheduler] Pengecekan ulang tahun otomatis dijadwalkan tiap jam 00:00 (Asia/Jakarta).");
 }
 
 module.exports = { startBirthdayScheduler };
