@@ -11,7 +11,7 @@ const BIRTHDAY_MESSAGES = [
 module.exports = {
     name: "ultah",
 
-    execute(message) {
+    async execute(message) {
         // Cuma admin/mod yang boleh pakai command ini
         if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
             return message.reply({
@@ -31,9 +31,18 @@ module.exports = {
 
         const randomMessage = BIRTHDAY_MESSAGES[Math.floor(Math.random() * BIRTHDAY_MESSAGES.length)];
 
-        return message.channel.send({
-            content: `Selamat ulang tahun, ${user}! 🎂 ${randomMessage}`,
-            allowedMentions: { users: [user.id] },
-        });
+        try {
+            return await message.channel.send({
+                content: `Selamat ulang tahun, ${user}! 🎂 ${randomMessage}`,
+                files: [user.displayAvatarURL({ extension: "jpg", size: 1024 })],
+                allowedMentions: { users: [user.id] },
+            });
+        } catch (err) {
+            console.error("[ultah] Gagal kirim pesan ulang tahun:", err.message);
+            return message.reply({
+                content: "Gagal kirim ucapan, kemungkinan bot gak punya izin 'Send Messages' di channel ini 😥",
+                allowedMentions: { repliedUser: false },
+            }).catch(() => {});
+        }
     },
 };
