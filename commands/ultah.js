@@ -1,4 +1,4 @@
-const { PermissionsBitField, EmbedBuilder } = require("discord.js");
+const { PermissionsBitField, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require("discord.js");
 const { generateBirthdayCard } = require("../birthdayCardGenerator");
 
 // Pesan ucapan ulang tahun
@@ -73,13 +73,45 @@ module.exports = {
                 .setImage(randomGif)
         );
 
+        // Tombol interaktif: Ikut Rayain (counter) + Kirim Ucapan Juga (modal)
+        const rayainButton = new ButtonBuilder()
+            .setCustomId(`ultah_rayain|${user.id}`)
+            .setLabel("🎉 Ikut Rayain! (0)")
+            .setStyle(ButtonStyle.Primary);
+
+        const ucapanButton = new ButtonBuilder()
+            .setCustomId(`ultah_ucapan|${user.id}`)
+            .setLabel("💌 Kirim Ucapan Juga")
+            .setStyle(ButtonStyle.Secondary);
+
+        const buttonRow = new ActionRowBuilder().addComponents(rayainButton, ucapanButton);
+
         try {
-            return await message.channel.send({
+            const sentMessage = await message.channel.send({
                 content: `${user}`,
                 embeds,
                 files,
+                components: [buttonRow],
                 allowedMentions: { users: [user.id] },
             });
+
+            // Auto react emoji rame-rame biar kesan makin meriah
+            const celebrationEmojis = ["🎉", "🥳", "❤️", "🎂"];
+            for (const emoji of celebrationEmojis) {
+                await sentMessage.react(emoji).catch(() => {});
+            }
+
+            // Bikin thread khusus biar semua ucapan dari "Kirim Ucapan Juga" ngumpul rapi
+            try {
+                await sentMessage.startThread({
+                    name: `🎉 Ucapan buat ${user.username}`,
+                    autoArchiveDuration: 1440, // auto-archive setelah 1 hari gak ada aktivitas
+                });
+            } catch (err) {
+                console.log("[ultah] Gagal bikin thread ucapan:", err.message);
+            }
+
+            return sentMessage;
         } catch (err) {
             console.error("[ultah] Gagal kirim pesan ulang tahun:", err.message);
             return message.reply({

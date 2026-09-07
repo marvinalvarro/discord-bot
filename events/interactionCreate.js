@@ -1,5 +1,7 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { generateKTPImage } = require("../ktpGenerator");
+const fs = require("fs");
+const path = require("path");
 
 // Channel khusus buat nampilin hasil KTP
 const KTP_CHANNEL_ID = "1534281400826728448";
@@ -7,6 +9,45 @@ const KTP_CHANNEL_ID = "1534281400826728448";
 // Nyimpen sementara data dari modal tahap 1, sambil nunggu user isi modal tahap 2.
 // Key: userId, Value: { nama, ttl, jk, golda, agama }
 const pendingKTPData = new Map();
+
+// ===============================
+// DATA SEMENTARA & PERMANEN BUAT FITUR ULTAH INTERAKTIF
+// ===============================
+const RAYAIN_DATA_PATH = path.join(__dirname, "..", "ultahRayainData.json");
+
+// Muat data "siapa aja yang udah klik Ikut Rayain" dari file, biar gak reset pas bot restart.
+// Format di file: { "<messageId>": ["userId1", "userId2", ...] }
+function loadRayainData() {
+    try {
+        const raw = fs.readFileSync(RAYAIN_DATA_PATH, "utf8");
+        const parsed = JSON.parse(raw);
+        const map = new Map();
+        for (const [messageId, userIds] of Object.entries(parsed)) {
+            map.set(messageId, new Set(userIds));
+        }
+        return map;
+    } catch (err) {
+        return new Map(); // file belum ada / kosong / rusak -> mulai dari kosong
+    }
+}
+
+function saveRayainData(map) {
+    try {
+        const obj = {};
+        for (const [messageId, userIdSet] of map.entries()) {
+            obj[messageId] = Array.from(userIdSet);
+        }
+        fs.writeFileSync(RAYAIN_DATA_PATH, JSON.stringify(obj, null, 2));
+    } catch (err) {
+        console.log("[ultah] Gagal simpan data rayain:", err.message);
+    }
+}
+
+const rayainParticipants = loadRayainData();
+
+// Nyimpen target user (yang ulang tahun) & channel/thread, dipakai pas modal "Kirim Ucapan" disubmit.
+// Key: userId (yang lagi ngisi modal), Value: { targetUserId, channelId }
+const pendingUcapan = new Map();
 
 function buildModalStep2() {
     const modal2 = new ModalBuilder()
@@ -236,6 +277,137 @@ module.exports = {
                 });
             } finally {
                 pendingKTPData.delete(interaction.user.id);
+            }
+            return;
+        }
+
+        // ===============================
+        // ===== FITUR ULTAH INTERAKTIF =====
+        // ===============================
+
+        // ===== Tombol "🎉 Ikut Rayain!" diklik =====
+        if (interaction.isButton() && interaction.customId.startsWith("ultah_rayain|")) {
+            const targetUserId = interaction.customId.split("|")[1];
+
+            if (interaction.user.id === targetUserId) {
+                await interaction.reply({
+                    content: "Hehe, gak bisa ngerayain ulang tahun sendiri 😄",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            const messageId = interaction.message.id;
+
+            if (!rayainParticipants.has(messageId)) {
+                rayainParticipants.set(messageId, new Set());
+            }
+            const participants = rayainParticipants.get(messageId);
+
+            if (participants.has(interaction.user.id)) {
+                await interaction.reply({
+                    content: "Kamu udah ikut rayain sebelumnya nih 🎉",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            participants.add(interaction.user.id);
+            saveRayainData(rayainParticipants);
+
+            try {
+                const oldRow = interaction.message.components[0];
+                const rayainBtn = ButtonBuilder.from(oldRow.components[0]).setLabel(
+                    `🎉 Ikut Rayain! (${participants.size})`
+                );
+                const ucapanBtn = ButtonBuilder.from(oldRow.components[1]);
+
+                const newRow = new ActionRowBuilder().addComponents(rayainBtn, ucapanBtn);
+
+                await interaction.update({ components: [newRow] });
+            } catch (err) {
+                console.log("[ultah] Gagal update tombol rayain:", err.message);
+                await interaction.reply({
+                    content: "🎉 Makasih udah ikut rayain!",
+                    ephemeral: true,
+                }).catch(() => {});
+            }
+            return;
+        }
+
+        // ===== Tombol "💌 Kirim Ucapan Juga" diklik -> munculin modal =====
+        if (interaction.isButton() && interaction.customId.startsWith("ultah_ucapan|")) {
+            const targetUserId = interaction.customId.split("|")[1];
+
+            // Kalau pesan ultah-nya punya thread, ucapan diarahkan ke situ biar rapi.
+            // Kalau gak ada thread (misal gagal dibuat), fallback ke channel biasa.
+            const destinationChannelId = interaction.message.thread
+                ? interaction.message.thread.id
+                : interaction.channelId;
+
+            pendingUcapan.set(interaction.user.id, {
+                targetUserId,
+                channelId: destinationChannelId,
+            });
+
+            const modal = new ModalBuilder()
+                .setCustomId("modal_ultah_ucapan")
+                .setTitle("Kirim Ucapan Ulang Tahun");
+
+            const ucapanInput = new TextInputBuilder()
+                .setCustomId("ucapan")
+                .setLabel("Tulis ucapan kamu")
+                .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder("Semoga makin sukses dan bahagia ya!")
+                .setRequired(true)
+                .setMaxLength(300);
+
+            modal.addComponents(new ActionRowBuilder().addComponents(ucapanInput));
+
+            try {
+                await interaction.showModal(modal);
+            } catch (err) {
+                console.log("[ultah] Gagal munculin modal ucapan:", err.message);
+            }
+            return;
+        }
+
+        // ===== Modal ucapan disubmit -> posting ucapan ke channel =====
+        if (interaction.isModalSubmit() && interaction.customId === "modal_ultah_ucapan") {
+            const pending = pendingUcapan.get(interaction.user.id);
+
+            if (!pending) {
+                await interaction.reply({
+                    content: "❌ Sesi kamu udah expired, coba klik tombol 'Kirim Ucapan Juga' lagi ya.",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            const ucapanText = interaction.fields.getTextInputValue("ucapan");
+
+            try {
+                const channel = await client.channels.fetch(pending.channelId);
+
+                if (channel) {
+                    await channel.send({
+                        content: `💌 **Ucapan dari ${interaction.user}** untuk <@${pending.targetUserId}>:\n> ${ucapanText}`,
+                        allowedMentions: { users: [pending.targetUserId] },
+                    });
+                }
+
+                await interaction.reply({
+                    content: "✅ Ucapan kamu berhasil dikirim!",
+                    ephemeral: true,
+                });
+            } catch (err) {
+                console.log("[ultah] Gagal kirim ucapan:", err.message);
+                await interaction.reply({
+                    content: "❌ Gagal kirim ucapan, coba lagi ya.",
+                    ephemeral: true,
+                }).catch(() => {});
+            } finally {
+                pendingUcapan.delete(interaction.user.id);
             }
         }
     },
