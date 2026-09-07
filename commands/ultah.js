@@ -1,7 +1,7 @@
 const { PermissionsBitField, EmbedBuilder } = require("discord.js");
 
 // Pesan ucapan ulang tahun
-const BIRTHDAY_MESSAGE = "Semoga di umur yang baru ini kamu selalu diberikan kesehatan, kebahagiaan, dan dimudahkan dalam segala urusan. Semoga semua hal yang kamu semogakan bisa satu-satu terwujud. Jangan lupa tetap jadi diri kamu sendiri, and enjoy your special day! 🤍✨";
+const BIRTHDAY_MESSAGE = "Semoga di umur yang baru ini kamu selalu diberikan kesehatan, kebahagiaan, dan keberuntungan.\nSemoga semua yang kamu harapkan dan perjuangkan bisa perlahan terwujud. Tetap jadi versi terbaik dari diri kamu, dan semoga tahun ini membawa banyak hal baik buat kamu. 🤍✨";
 
 // Beberapa GIF ulang tahun, dipilih random biar gak monoton
 // Catatan: link Discord CDN di bawah ini punya masa berlaku (ada parameter ?ex=...),
@@ -36,10 +36,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0xFFD700)
             .setTitle("🎂 Happy Birthday!")
-            .setDescription(`Happy birthday yaa, ${user}! 🥳\n\n━━━━━━━━━━━━━━━\n\n${BIRTHDAY_MESSAGE}`)
+            .setDescription(`Happy birthday yaa, ${user}! 🥳🎉\n\n───────────────\n\n${BIRTHDAY_MESSAGE}\n\n— Dari seluruh warga Game Verse🎮`)
             .setThumbnail(user.displayAvatarURL({ extension: "jpg", size: 512 }))
             .setImage(randomGif)
-            .setFooter({ text: `Dari seluruh warga Game Verse untuk ${user.username}` })
             .setTimestamp();
 
         try {
