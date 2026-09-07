@@ -34,9 +34,9 @@ module.exports = {
         const randomGif = BIRTHDAY_GIFS[Math.floor(Math.random() * BIRTHDAY_GIFS.length)];
 
         const embed = new EmbedBuilder()
-            .setColor(0xFF7AC6)
-            .setTitle("🎂 Happy Birthday! 🎉")
-            .setDescription(`Happy birthday yaa, ${user}! 🎉🥳\n\n${BIRTHDAY_MESSAGE}`)
+            .setColor(0xFFD700)
+            .setTitle("🎂 Happy Birthday!")
+            .setDescription(`Happy birthday yaa, ${user}! 🥳\n\n━━━━━━━━━━━━━━━\n\n${BIRTHDAY_MESSAGE}`)
             .setThumbnail(user.displayAvatarURL({ extension: "jpg", size: 512 }))
             .setImage(randomGif)
             .setFooter({ text: `Dari seluruh warga Game Verse untuk ${user.username}` })
