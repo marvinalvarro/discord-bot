@@ -1,4 +1,5 @@
 const { PermissionsBitField, EmbedBuilder } = require("discord.js");
+const { generateBirthdayCard } = require("../birthdayCardGenerator");
 
 // Pesan ucapan ulang tahun
 const BIRTHDAY_MESSAGE = "Semoga di umur yang baru ini kamu selalu diberikan kesehatan, kebahagiaan, dan keberuntungan.\nSemoga semua yang kamu harapkan dan perjuangkan bisa perlahan terwujud. Tetap jadi versi terbaik dari diri kamu, dan semoga tahun ini membawa banyak hal baik buat kamu. 🤍✨";
@@ -33,17 +34,50 @@ module.exports = {
 
         const randomGif = BIRTHDAY_GIFS[Math.floor(Math.random() * BIRTHDAY_GIFS.length)];
 
-        const embed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle("🎂 Happy Birthday!")
-            .setDescription(`Happy birthday yaa, ${user}! 🥳🎉\n\n───────────────\n\n${BIRTHDAY_MESSAGE}\n\n— Dari seluruh warga Game Verse🎮`)
-            .setThumbnail(user.displayAvatarURL({ extension: "jpg", size: 512 }))
-            .setImage(randomGif)
-            .setTimestamp();
+        const embeds = [];
+        const files = [];
+
+        // ===============================
+        // KARTU UCAPAN ULANG TAHUN (gambar custom, style cute)
+        // ===============================
+        try {
+            const cardBuffer = await generateBirthdayCard({
+                username: user.username,
+                avatarURL: user.displayAvatarURL({ extension: "png", size: 512 }),
+                message: BIRTHDAY_MESSAGE,
+                userId: user.id,
+            });
+
+            files.push({ attachment: cardBuffer, name: "birthday_card.png" });
+
+            const cardEmbed = new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setImage("attachment://birthday_card.png");
+
+            embeds.push(cardEmbed);
+        } catch (err) {
+            console.error("[ultah] Gagal generate kartu ucapan:", err.message);
+            // Kalau gagal generate gambar, tetap lanjut kirim GIF + teks sederhana
+            embeds.push(
+                new EmbedBuilder()
+                    .setColor(0xFFD700)
+                    .setTitle("🎂 Happy Birthday!")
+                    .setDescription(`Happy birthday yaa, ${user}! 🥳🎉\n\n${BIRTHDAY_MESSAGE}\n\n— Dari seluruh warga Game Verse🎮`)
+            );
+        }
+
+        // Embed kedua khusus buat GIF
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setImage(randomGif)
+        );
 
         try {
             return await message.channel.send({
-                embeds: [embed],
+                content: `${user}`,
+                embeds,
+                files,
                 allowedMentions: { users: [user.id] },
             });
         } catch (err) {
