@@ -56,7 +56,7 @@ async function checkAndSendBirthdays(client) {
     }
 }
 
-/**
+/**========
  * Jalankan ini sekali di index.js setelah bot ready, contoh:
  * const { startBirthdayScheduler } = require("./birthdayScheduler");
  * startBirthdayScheduler(client);
