@@ -28,6 +28,8 @@ const commandDescriptions = {
     ktp: "Bikin KTP warga Game Verse kamu sendiri",
     invites: "Cek jumlah invite valid kamu (atau orang lain kalau di-tag)",
     season: "Lihat leaderboard voice/chat dari season yang udah lewat",
+    streak: "Cek streak harian kamu (atau orang lain kalau di-tag) di channel streak",
+    streakleaderboard: "Lihat top 10 user dengan streak harian aktif tertinggi",
 };
 
 module.exports = {
@@ -56,6 +58,12 @@ module.exports = {
                 `> 💬 **Chat XP** — dapet XP tiap kirim pesan (ada jeda dikit biar gak spam)\n\n` +
                 `Pas level kamu naik, bakal ada notif otomatis muncul di channel khusus. Cek progress kapan aja pake \`${config.prefix}rank\` (voice) atau \`${config.prefix}rankchat\` (chat).\n\n` +
                 `━━━━━━━━━━━━━━━━━━━\n` +
+                `**🔥 STREAK HARIAN**\n` +
+                `Kirim pesan (teks/stiker/foto/video apapun) tiap hari di channel streak biar api kamu terus nyala!\n\n` +
+                `> 🔥 **${config.prefix}streak** — cek streak kamu sekarang\n` +
+                `> 🏆 **${config.prefix}streakleaderboard** — lihat top streak paling panjang\n\n` +
+                `Kelewat 1 hari gak kirim pesan, streak-nya reset dari 0 lagi. Jangan sampai putus ya!\n\n` +
+                `━━━━━━━━━━━━━━━━━━━\n` +
                 `**🎮 GAME & COIN**\n` +
                 `Main game buat ngumpulin **coin** (dimulai dari 100 coin gratis):\n\n` +
                 `> 🔢 **${config.prefix}tebakangka** — tebak angka lewat chat\n` +
@@ -69,7 +77,7 @@ module.exports = {
                 `Ketik langsung salah satu kata di bawah + tag orangnya, gak perlu prefix ${config.prefix}:\n\n` +
                 `> **hy/hai/hi/halo sayang** @orang — gombalan manis\n` +
                 `> **hy/hai/hi/halo ganteng/cantik** @orang — gombalan manis\n` +
-                `> **peluk** @orang — bot peyukin orangnya\n` +
+                `> **nova pp** @orang — nampilin PP orangnya\n` +
                 `> **cium** @orang — bot ciumin orangnya\n` +
                 `> **pap / mana pap** @orang — kirim PAP orangnya\n\n` +
                 `Contoh: \`hy sayang @moon\`\n\n` +
