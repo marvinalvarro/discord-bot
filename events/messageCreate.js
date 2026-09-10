@@ -3,6 +3,7 @@ const Groq = require("groq-sdk");
 const { EmbedBuilder } = require("discord.js");
 const { incrementBanCounter } = require("../banCounter");
 const { handleChatMessage } = require("../chatXP");
+const { handleStreakMessage } = require("../streakTracker");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -164,6 +165,13 @@ module.exports = {
         // XP CHAT
         // ===============================
         handleChatMessage(message, config);
+
+        // ===============================
+        // STREAK HARIAN (channel khusus)
+        // ===============================
+        handleStreakMessage(message).catch((err) => {
+            console.error("[streakTracker] Error:", err);
+        });
 
         // ===============================
         // AUTO RESPON + AVATAR
