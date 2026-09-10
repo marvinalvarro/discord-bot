@@ -1,11 +1,10 @@
-
 const fs = require("fs");
 const path = require("path");
 
 const STREAK_DATA_PATH = path.join(__dirname, "streakData.json");
 
 // Channel khusus tempat streak dihitung. Pesan di channel lain gak ngaruh.
-const STREAK_CHANNEL_ID = "1477885866046263329";
+const STREAK_CHANNEL_ID = "1531194725854482544";
 
 function loadStreakData() {
     try {
