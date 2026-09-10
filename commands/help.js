@@ -30,6 +30,8 @@ const commandDescriptions = {
     season: "Lihat leaderboard voice/chat dari season yang udah lewat",
     streak: "Cek streak harian kamu (atau orang lain kalau di-tag) di channel streak",
     streakleaderboard: "Lihat top 10 user dengan streak harian aktif tertinggi",
+    ultah: "Kirim ucapan ulang tahun ke member (khusus admin/mod)",
+    setultah: "Daftarin tanggal lahir kamu biar bot otomatis ngucapin pas hari-H",
 };
 
 module.exports = {
