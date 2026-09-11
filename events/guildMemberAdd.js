@@ -57,7 +57,7 @@ module.exports = {
 
         if (generalChannel) {
             const casualText =
-                `Welcome, ${member}! Ada muka baru nih di sini. Jangan lupa verif dulu ya, tinggal tekan tombol (reaction) ceklis di <#${VERIFICATION_CHANNEL_ID}>`;
+                `Welcome, ${member}! Ada muka baru nih di sini. Spill dikit dong, ampir ke sini mau cari temen mabar, tempat ngobrol, atau sekadar nyari jodoh kwkwk. 🤣`;
 
             try {
                 await generalChannel.send(casualText);
