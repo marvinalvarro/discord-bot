@@ -26,19 +26,26 @@ module.exports = {
 
         if (channel) {
             const RULES_GUIDE_CHANNEL_ID = "1544265708920242236"; // udah digabung, peraturan + panduan jadi satu channel
+            const ANNOUNCEMENT_CHANNEL_ID = "1529480671800852500"; // channel pengumuman, tempat daftar ultah
+            const STREAK_CHANNEL_ID = "1531194725854482544";
+            const ULTAH_CHANNEL_ID = "1531332595336482917";
+            const KTP_CHANNEL_ID = "1534281400826728448";
 
             const embed = new EmbedBuilder()
                 .setColor(0x57F287)
                 .setDescription(
-                    `Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang!\n\n` +
-                    `Di sini tempatnya nongkrong, mabar, dan ngobrol bareng warga yang asik-asik. Jangan malu-malu, langsung aja gaskeun ngobrol di channel yang ada\n\n` +
-                    `Sebelum itu, jangan lupa mampir dulu ke <#${RULES_GUIDE_CHANNEL_ID}> buat baca aturan main sekaligus panduan lengkap kalau lu masih baru banget pake Discord.\n\n` +
-                    `Oh iya, jangan lupa verifikasi diri kamu dulu di <#${VERIFICATION_CHANNEL_ID}> biar bisa akses semua channel ya!\n\n` +
-                    `Have fun & enjoy the vibe, warga!`
+                    `Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang! 🎉`
+                )
+                .addFields(
+                    { name: "📖 Panduan Bermain Discord & Rules", value: `<#${RULES_GUIDE_CHANNEL_ID}>`, inline: false },
+                    { name: "🎂 Daftar Ultah", value: `<#${ANNOUNCEMENT_CHANNEL_ID}>`, inline: false },
+                    { name: "🎁 Sambutan Ultah", value: `<#${ULTAH_CHANNEL_ID}>`, inline: false },
+                    { name: "🔥 Streak Harian", value: `<#${STREAK_CHANNEL_ID}>`, inline: false },
+                    { name: "🪪 Bikin KTP", value: `<#${KTP_CHANNEL_ID}>`, inline: false }
                 )
                 .setThumbnail(member.user.displayAvatarURL({ extension: "png", size: 256 }))
                 .setImage(WELCOME_GIF_URL)
-                .setFooter({ text: `Member ke-${member.guild.memberCount}` })
+                .setFooter({ text: `Member ke-${member.guild.memberCount} • Have fun & enjoy the vibe!` })
                 .setTimestamp();
 
             try {
@@ -57,7 +64,7 @@ module.exports = {
 
         if (generalChannel) {
             const casualText =
-                `Welcome, ${member}! Ada muka baru nih di sini. Spill dikit dong, ampir ke sini mau cari temen mabar, tempat ngobrol, atau sekadar nyari jodoh kwkwk. 🤣`;
+                `Welcome, ${member}! Ada muka baru nih di sini. Spill dikit dong, ampir ke sini mau cari temen mabar, tempat ngobrol, atau sekadar nyari jodoh kwkwk.🤣`;
 
             try {
                 await generalChannel.send(casualText);
