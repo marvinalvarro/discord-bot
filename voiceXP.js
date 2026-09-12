@@ -14,6 +14,15 @@ const IGNORE_BOTS = true;            // bot lain gak dapat XP
 const IGNORE_IF_ALONE = false;       // true = gak dapat XP kalau sendirian di VC
 const IGNORE_IF_MUTED_DEAFENED = false; // true = gak dapat XP kalau self-mute/deaf
 
+// ID user yang GAK dapat voice XP sama sekali (admin/founder), biar leaderboard murni dari member biasa
+const IGNORED_USER_IDS = [
+    "1185912082072350781",
+    "765505191570046977",
+    "1403713173273575435",
+    "1015666814325375067",
+    "1093972454705221633",
+];
+
 const EMBED_COLOR = 0x1ABC9C;
 const ACCENT_HEX = "#1ABC9C";
 
@@ -110,6 +119,7 @@ function startVoiceXPLoop(client, config = {}) {
 
                 const members = channel.members.filter((m) => {
                     if (IGNORE_BOTS && m.user.bot) return false;
+                    if (IGNORED_USER_IDS.includes(m.id)) return false;
                     if (IGNORE_IF_MUTED_DEAFENED && (m.voice.selfMute || m.voice.selfDeaf)) return false;
                     return true;
                 });
