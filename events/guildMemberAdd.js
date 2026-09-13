@@ -26,6 +26,7 @@ module.exports = {
 
         if (channel) {
             const RULES_GUIDE_CHANNEL_ID = "1544265708920242236"; // udah digabung, peraturan + panduan jadi satu channel
+            const ANNOUNCEMENT_CHANNEL_ID = "1529480671800852500"; // channel pengumuman, tempat daftar ultah
             const STREAK_CHANNEL_ID = "1531194725854482544";
             const ULTAH_CHANNEL_ID = "1531332595336482917";
             const KTP_CHANNEL_ID = "1534281400826728448";
@@ -37,9 +38,10 @@ module.exports = {
                 )
                 .addFields(
                     { name: "📖 Panduan Bermain Discord & Rules", value: `<#${RULES_GUIDE_CHANNEL_ID}>`, inline: false },
-                    { name: "🎁 Daftar & Sambutan Ultah", value: `<#${ULTAH_CHANNEL_ID}>`, inline: false },
-                    { name: "🔥 Streak Harian Discord", value: `<#${STREAK_CHANNEL_ID}>`, inline: false },
-                    { name: "🪪 Bikin KTP Server", value: `<#${KTP_CHANNEL_ID}>`, inline: false }
+                    { name: "🎂 Daftar Ulang tahun", value: `<#${ANNOUNCEMENT_CHANNEL_ID}>`, inline: false },
+                    { name: "🎁 Sambutan Ultah", value: `<#${ULTAH_CHANNEL_ID}>`, inline: false },
+                    { name: "🔥 Streak Harian", value: `<#${STREAK_CHANNEL_ID}>`, inline: false },
+                    { name: "🪪 Bikin KTP", value: `<#${KTP_CHANNEL_ID}>`, inline: false }
                 )
                 .setThumbnail(member.user.displayAvatarURL({ extension: "png", size: 256 }))
                 .setImage(WELCOME_GIF_URL)
