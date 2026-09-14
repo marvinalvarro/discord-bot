@@ -72,7 +72,12 @@ const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/ph
 const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban walau chat di trap channel
 
 // Channel khusus partnership, link invite boleh di-post di sini tanpa kena auto-ban
-const PARTNERSHIP_CHANNEL_ID = "1549024241830203453";
+const PARTNERSHIP_CHANNEL_ID = "1549031435107827844";
+
+// Channel anti-link/phishing: SEMUA link (bukan cuma invite Discord) bikin auto-ban, kecuali WHITELIST_USER_IDS
+const ANTI_LINK_CHANNEL_ID = "1515853805470613655";
+const ANY_LINK_REGEX = /(https?:\/\/|www\.)\S+/i;
+const ANTI_LINK_BAN_REASON = "Auto-ban: mengirim link di channel ini (anti-phishing)";
 let banCount = 0;
 
 // ===============================
@@ -171,6 +176,30 @@ module.exports = {
                     }
                 } catch (err) {
                     console.error("Gagal auto-ban invite link:", err);
+                }
+                return;
+            }
+        }
+
+        // ===============================
+        // AUTO-BAN LINK DI CHANNEL ANTI-PHISHING (link apapun, kecuali whitelist)
+        // ===============================
+        if (message.channelId === ANTI_LINK_CHANNEL_ID && ANY_LINK_REGEX.test(message.content)) {
+            if (WHITELIST_USER_IDS.includes(message.author.id)) {
+                console.log(`[WHITELIST] ${message.author.tag} bebas kirim link di channel anti-phishing.`);
+            } else {
+                try {
+                    await message.delete().catch(() => {});
+
+                    const member = message.member;
+                    if (member && member.bannable) {
+                        await member.ban({ reason: ANTI_LINK_BAN_REASON });
+                        console.log(`[AUTO-BAN ANTI-LINK] ${message.author.tag} (${message.author.id}) di-ban karena kirim link di channel anti-phishing.`);
+                    } else {
+                        console.log(`Tidak bisa ban ${message.author.tag} (anti-link) — mungkin role bot lebih rendah, atau target admin/owner.`);
+                    }
+                } catch (err) {
+                    console.error("Gagal auto-ban anti-link:", err);
                 }
                 return;
             }
