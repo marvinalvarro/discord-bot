@@ -1,79 +1,336 @@
+const config = require("../config");
+const Groq = require("groq-sdk");
 const { EmbedBuilder } = require("discord.js");
-const { handleMemberJoin } = require("../inviteTracker");
+const { incrementBanCounter } = require("../banCounter");
+const { handleChatMessage } = require("../chatXP");
+const { handleStreakMessage } = require("../streakTracker");
+const { handleDonationMessage } = require("../donationTracker");
 
-// Ganti ID channel welcome-goodbye di server kamu
-const WELCOME_GOODBYE_CHANNEL_ID = "1477885865584885860";
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ID channel general-chat
-const GENERAL_CHAT_ID = "1520226091107618957";
+const SYSTEM_PROMPT = `Kamu adalah Nova Verse, bot Discord untuk komunitas Game Verse.
+Gaya bicara kamu santai, gaul, pakai bahasa sehari-hari ala anak nongkrong Indonesia (boleh pakai "lu/gua", singkatan gaul, emoji secukupnya).
+Jawaban kamu singkat aja, maksimal 3-4 kalimat, jangan bertele-tele.
+Ngobrol soal apa aja sesuai yang ditanya orang — gak harus selalu nyambung-nyambungin ke topik game kalau orangnya gak nanya soal game.
+Kamu TIDAK BISA benar-benar mencarikan jodoh, memberi hadiah asli, atau melakukan aksi di dunia nyata — kalau ada yang minta itu, becandain aja dengan santai, jangan pura-pura bisa.
+Kalau ada yang tanya soal channel atau aturan server, arahkan mereka untuk cek channel #rules atau #take-role.`;
 
-// ID channel verification
-const VERIFICATION_CHANNEL_ID = "1532578680818237602";
+// ===============================
+// WHITELIST TESTER AI (bisa akses chat AI walau bukan VIP/Booster)
+// ===============================
+const AI_TESTER_IDS = ["1015666814325375067"]; // founder
 
-// GIF welcome banner
-const WELCOME_GIF_URL = "https://cdn.discordapp.com/attachments/1391005977393758218/1397859323455078481/3ee9ac3d-671a-4e2a-98a0-c3d4cf9c5aee.gif";
+// ===============================
+// RETRY HELPER BUAT GROQ API
+// ===============================
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 2000;
 
-module.exports = {
-    name: "guildMemberAdd",
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-    async execute(member) {
-        console.log("[guildMemberAdd] Event triggered untuk member:", member.user.tag);
+async function generateContentWithRetry(text) {
+    let lastError;
 
-        // Deteksi invite mana yang kepake, tambahin +1 invite valid ke pengundang
-        handleMemberJoin(member).catch((err) => console.error("[inviteTracker] Error:", err));
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const completion = await groq.chat.completions.create({
+                model: "openai/gpt-oss-120b",
+                messages: [
+                    { role: "system", content: SYSTEM_PROMPT },
+                    { role: "user", content: text },
+                ],
+                max_tokens: 300,
+            });
+            return completion.choices[0]?.message?.content?.trim() || "";
+        } catch (err) {
+            lastError = err;
+            const isRetryable = err?.status === 503 || err?.status === 500;
 
-        const channel = member.guild.channels.cache.get(WELCOME_GOODBYE_CHANNEL_ID);
-
-        if (channel) {
-            const RULES_GUIDE_CHANNEL_ID = "1544265708920242236"; // udah digabung, peraturan + panduan jadi satu channel
-            const ANNOUNCEMENT_CHANNEL_ID = "1529480671800852500"; // channel pengumuman, tempat daftar ultah
-            const STREAK_CHANNEL_ID = "1531194725854482544";
-            const ULTAH_CHANNEL_ID = "1531332595336482917";
-            const KTP_CHANNEL_ID = "1534281400826728448";
-
-            const embed = new EmbedBuilder()
-                .setColor(0x57F287)
-                .setDescription(
-                    `Selamat datang, ${member}! Lu resmi jadi bagian dari **Game Verse** sekarang! 🎉`
-                )
-                .addFields(
-                    { name: "📖 Panduan Bermain Discord & Rules", value: `<#${RULES_GUIDE_CHANNEL_ID}>`, inline: false },
-                    { name: "🎂 Daftar Ulang tahun", value: `<#${ANNOUNCEMENT_CHANNEL_ID}>`, inline: false },
-                    { name: "🎁 Sambutan Ultah", value: `<#${ULTAH_CHANNEL_ID}>`, inline: false },
-                    { name: "🔥 Streak Harian", value: `<#${STREAK_CHANNEL_ID}>`, inline: false },
-                    { name: "🪪 Bikin KTP", value: `<#${KTP_CHANNEL_ID}>`, inline: false }
-                )
-                .setThumbnail(member.user.displayAvatarURL({ extension: "png", size: 256 }))
-                .setImage(WELCOME_GIF_URL)
-                .setFooter({ text: `Member ke-${member.guild.memberCount} • Have fun & enjoy the vibe!` })
-                .setTimestamp();
-
-            try {
-                await channel.send({ embeds: [embed] });
-                console.log("[guildMemberAdd] Berhasil kirim embed ke welcome-goodbye.");
-            } catch (err) {
-                console.log(`[guildMemberAdd] Gagal kirim pesan welcome ke channel ${WELCOME_GOODBYE_CHANNEL_ID}:`, err.message);
+            if (!isRetryable || attempt === MAX_RETRIES) {
+                throw err;
             }
-        } else {
-            console.log("[guildMemberAdd] Channel welcome-goodbye TIDAK DITEMUKAN, cek ID:", WELCOME_GOODBYE_CHANNEL_ID);
-        }
 
-        // Pesan teks santai ke general-chat
-        const generalChannel = member.guild.channels.cache.get(GENERAL_CHAT_ID);
-        console.log("[guildMemberAdd] Cek generalChannel:", generalChannel ? generalChannel.name : "TIDAK DITEMUKAN");
-
-        if (generalChannel) {
-            const casualText =
-                `Welcome, ${member}! Ada muka baru nih di sini. Spill dikit dong, ampir ke sini mau cari temen mabar, tempat ngobrol, atau sekadar nyari jodoh kwkwk.🤣`;
-
-            try {
-                await generalChannel.send(casualText);
-                console.log("[guildMemberAdd] Berhasil kirim pesan santai ke general-chat.");
-            } catch (err) {
-                console.log(`[guildMemberAdd] Gagal kirim pesan santai ke general-chat ${GENERAL_CHAT_ID}:`, err.message);
-            }
-        } else {
-            console.log("[guildMemberAdd] Channel general-chat TIDAK DITEMUKAN, cek ID:", GENERAL_CHAT_ID);
+            const delay = RETRY_DELAY_MS * (attempt + 1);
+            console.log(`[Groq] Kena error server, retry ke-${attempt + 1} dalam ${delay / 1000} detik...`);
+            await sleep(delay);
         }
     }
+
+    throw lastError;
+}
+
+// ===============================
+// KONFIGURASI AUTO-BAN LINK INVITE DISCORD LAIN
+// ===============================
+const INVITE_LINK_REGEX = /(discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9-]+/i;
+const INVITE_BAN_REASON = "Auto-ban: mengirim link invite server Discord lain (indikasi member poaching)";
+const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
+const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
+const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
+const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban walau chat di trap channel
+let banCount = 0;
+
+// ===============================
+// HELPER: Cek akses Booster/VIP (atau tester AI)
+// ===============================
+function hasVIPAccess(member) {
+    if (!member) return false;
+
+    if (AI_TESTER_IDS.includes(member.id)) return true; // bypass khusus tester
+
+    const isBooster = member.premiumSince !== null;
+    const isVIP = config.vipRoleId
+        ? member.roles.cache.has(config.vipRoleId)
+        : false;
+    return isBooster || isVIP;
+}
+
+module.exports = {
+    name: "messageCreate",
+
+    async execute(message, client) {
+        console.log("Pesan diterima:", message.content);
+
+        // ===============================
+        // TRACKER DONASI SAWERIA (harus SEBELUM pengecekan bot,
+        // karena pesan webhook Saweria dianggap "bot message" sama Discord)
+        // ===============================
+        try {
+            handleDonationMessage(message);
+        } catch (err) {
+            console.error("[donationTracker] Error:", err);
+        }
+
+        if (message.author.bot) return;
+
+        // ===============================
+        // AUTO-BAN TRAP CHANNEL (paling atas biar dicek duluan)
+        // ===============================
+        if (message.channelId === TRAP_CHANNEL_ID) {
+            if (WHITELIST_USER_IDS.includes(message.author.id)) {
+                console.log(`[WHITELIST] ${message.author.tag} bebas chat di trap channel.`);
+                return;
+            }
+
+            try {
+                await message.delete().catch(() => {});
+
+                const member = message.member;
+                if (member && member.bannable) {
+                    await member.ban({ reason: BAN_REASON });
+                    banCount++;
+
+                    console.log(`[AUTO-BAN] ${message.author.tag} (${message.author.id}) di-ban. Total: ${banCount}`);
+
+                    await incrementBanCounter(message.channel).catch((err) => {
+                        console.error("Gagal update ban counter:", err);
+                    });
+
+                    if (LOG_CHANNEL_ID) {
+                        const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+                        if (logChannel) {
+                            const embed = new EmbedBuilder()
+                                .setColor(0xE74C3C)
+                                .setTitle("🔨 Auto-Ban Triggered")
+                                .setDescription(`**User:** ${message.author.tag} (${message.author.id})\n**Alasan:** ${BAN_REASON}`)
+                                .setFooter({ text: `Total bans: ${banCount}` })
+                                .setTimestamp();
+                            logChannel.send({ embeds: [embed] }).catch(() => {});
+                        }
+                    }
+                } else {
+                    console.log(`Tidak bisa ban ${message.author.tag} — mungkin role bot lebih rendah, atau target admin/owner.`);
+                }
+            } catch (err) {
+                console.error("Gagal auto-ban:", err);
+            }
+            return;
+        }
+
+        // ===============================
+        // AUTO-BAN LINK INVITE DISCORD LAIN (berlaku di SEMUA channel)
+        // ===============================
+        if (INVITE_LINK_REGEX.test(message.content)) {
+            if (WHITELIST_USER_IDS.includes(message.author.id)) {
+                console.log(`[WHITELIST] ${message.author.tag} bebas kirim link invite.`);
+            } else {
+                try {
+                    await message.delete().catch(() => {});
+
+                    const member = message.member;
+                    if (member && member.bannable) {
+                        await member.ban({ reason: INVITE_BAN_REASON });
+                        console.log(`[AUTO-BAN INVITE] ${message.author.tag} (${message.author.id}) di-ban karena kirim link invite.`);
+                    } else {
+                        console.log(`Tidak bisa ban ${message.author.tag} (invite link) — mungkin role bot lebih rendah, atau target admin/owner.`);
+                    }
+                } catch (err) {
+                    console.error("Gagal auto-ban invite link:", err);
+                }
+                return;
+            }
+        }
+
+        // ===============================
+        // XP CHAT
+        // ===============================
+        handleChatMessage(message, config);
+
+        // ===============================
+        // STREAK HARIAN (channel khusus)
+        // ===============================
+        handleStreakMessage(message).catch((err) => {
+            console.error("[streakTracker] Error:", err);
+        });
+
+        // ===============================
+        // AUTO RESPON + AVATAR
+        // ===============================
+        const responses = {
+            "hy sayang": "APA SAYANG ❤️",
+            "hai sayang": "APA SAYANG ❤️",
+            "hi sayang": "APA SAYANG ❤️",
+            "halo sayang": "APA SAYANG ❤️",
+
+            "hy ganteng": "Apa Cintaku ❤️",
+            "hai ganteng": "Apa Cintaku ❤️",
+            "hi ganteng": "Apa Cintaku ❤️",
+            "halo ganteng": "Apa Cintaku ❤️",
+
+            "hy cantik": "Apa Cintaku ❤️",
+            "hai cantik": "Apa Cintaku ❤️",
+            "hi cantik": "Apa Cintaku ❤️",
+            "halo cantik": "Apa Cintaku ❤️",
+
+            "nova pp": "",
+            "cium": "😘 Muachh!!",
+            "pap": "📸 Nih PAP nya 😳",
+            "mana pap": "📸 Nih PAP nya, jangan disimpan lama-lama ya 🥺"
+        };
+
+        const lower = message.content.toLowerCase();
+
+        for (const trigger in responses) {
+            if (lower.startsWith(trigger)) {
+
+                const user = message.mentions.users.first();
+
+                if (!user) {
+                    return message.reply({
+                        content: "Tag dulu orangnya ya 😊",
+                        allowedMentions: { repliedUser: false },
+                    });
+                }
+
+                const replyPayload = {
+                    files: [
+                        user.displayAvatarURL({ extension: "jpg", size: 1024 }),
+                    ],
+                    allowedMentions: { repliedUser: false },
+                };
+
+                if (responses[trigger]) {
+                    replyPayload.content = responses[trigger];
+                }
+
+                return message.reply(replyPayload);
+            }
+        }
+
+        // ===============================
+        // RESPON SAAT BOT DI-MENTION
+        // ===============================
+        if (message.mentions.has(client.user)) {
+
+            const text = message.content
+                .replace(`<@${client.user.id}>`, "")
+                .replace(`<@!${client.user.id}>`, "")
+                .trim()
+                .toLowerCase();
+
+            if (text === "halo" || text === "hai" || text === "hi") {
+                return message.reply("Halo juga! 👋");
+            }
+
+            if (text === "morning" || text === "pagi") {
+                return message.reply("Morning juga! 🌞");
+            }
+
+            if (text === "assalamualaikum") {
+                return message.reply("Waalaikumsalam warahmatullahi wabarakatuh 🤲");
+            }
+
+            if (!text) {
+                return message.reply("Halo! Ada yang bisa gue bantu? Coba tulis pertanyaan lu ya 😊");
+            }
+
+            // ===============================
+            // BUTUH AI (Groq) - KHUSUS VIP/Booster/Tester
+            // ===============================
+            if (!hasVIPAccess(message.member)) {
+            return message.reply(
+             `🔒 Wah kalo mau ngobrol interaktif kayak gini, gua butuh 'power' lebih dulu bro ini khusus **Server Booster** atau role **VIP** ya!\n\nCukup **VIP 5k** aja, boost server dulu atau order VIP di bio founder. Nanti notifnya bakal muncul di <#${config.logsVipChannelId}> 😉`
+             );
+            }
+
+            try {
+                await message.channel.sendTyping();
+
+                const reply = await generateContentWithRetry(text);
+
+                return message.reply(reply || "Hmm, gue bingung mau jawab apa nih, coba tanya lagi ya 😅");
+            } catch (err) {
+                console.error("Gagal manggil Groq API:", err);
+
+                if (err?.status === 429) {
+                    return message.reply(
+                        "🥱 Waduh, otak AI-ku lagi capek nih! Jatah chat udah abis dipake ngobrol sama kalian semua. Istirahat dulu ya, coba lagi bentar~"
+                    );
+                }
+
+                if (err?.status === 503 || err?.status === 500) {
+                    return message.reply(
+                        "😵 Server AI-nya lagi rame banget dipake orang-orang, udah gue coba ulang beberapa kali tapi masih gagal. Coba tanya lagi bentar ya~"
+                    );
+                }
+
+                return message.reply("hmm otakku lagi ngadat dikit, coba tanya lagi nanti ya 😅");
+            }
+        }
+
+        // ===============================
+        // COMMAND PREFIX
+        // ===============================
+        console.log("DEBUG - prefix:", JSON.stringify(config.prefix));
+        console.log("DEBUG - starts with prefix?", message.content.startsWith(config.prefix));
+
+        if (!message.content.startsWith(config.prefix)) return;
+
+        const args = message.content
+            .slice(config.prefix.length)
+            .trim()
+            .split(/ +/);
+
+        const commandName = args.shift().toLowerCase();
+
+        console.log("DEBUG - commandName:", commandName);
+        console.log("DEBUG - available commands:", [...client.commands.keys()]);
+
+        const command = client.commands.get(commandName);
+
+        console.log("DEBUG - command found?", !!command);
+
+        if (!command) return;
+
+        try {
+            console.log("DEBUG - executing command...");
+            command.execute(message, args, client);
+            console.log("DEBUG - command executed without throwing");
+        } catch (err) {
+            console.error("DEBUG - ERROR:", err);
+            message.reply("Terjadi error.");
+        }
+    },
 };

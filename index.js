@@ -7,6 +7,7 @@ const config = require("./config");
 const { startVoiceXPLoop } = require("./voiceXP");
 const { startBackupLoop } = require("./dataBackup");
 const { startBirthdayScheduler } = require("./birthdayScheduler");
+const { startDonationScheduler } = require("./donationScheduler");
 
 const client = new Client({
     intents: [
@@ -43,6 +44,7 @@ client.once("ready", () => {
     startVoiceXPLoop(client, config);
     startBackupLoop();
     startBirthdayScheduler(client);
+    startDonationScheduler(client);
 });
 
 client.login(config.token);
