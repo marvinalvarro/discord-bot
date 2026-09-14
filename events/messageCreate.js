@@ -4,6 +4,7 @@ const { EmbedBuilder } = require("discord.js");
 const { incrementBanCounter } = require("../banCounter");
 const { handleChatMessage } = require("../chatXP");
 const { handleStreakMessage } = require("../streakTracker");
+const { handleDonationMessage } = require("../donationTracker");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -69,6 +70,9 @@ const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-c
 const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
 const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
 const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban walau chat di trap channel
+
+// Channel khusus partnership, link invite boleh di-post di sini tanpa kena auto-ban
+const PARTNERSHIP_CHANNEL_ID = "1549024241830203453";
 let banCount = 0;
 
 // ===============================
@@ -91,6 +95,17 @@ module.exports = {
 
     async execute(message, client) {
         console.log("Pesan diterima:", message.content);
+
+        // ===============================
+        // TRACKER DONASI SAWERIA (harus SEBELUM pengecekan bot,
+        // karena pesan webhook Saweria dianggap "bot message" sama Discord)
+        // ===============================
+        try {
+            handleDonationMessage(message);
+        } catch (err) {
+            console.error("[donationTracker] Error:", err);
+        }
+
         if (message.author.bot) return;
 
         // ===============================
@@ -138,9 +153,9 @@ module.exports = {
         }
 
         // ===============================
-        // AUTO-BAN LINK INVITE DISCORD LAIN (berlaku di SEMUA channel)
+        // AUTO-BAN LINK INVITE DISCORD LAIN (berlaku di SEMUA channel, KECUALI channel partnership)
         // ===============================
-        if (INVITE_LINK_REGEX.test(message.content)) {
+        if (message.channelId !== PARTNERSHIP_CHANNEL_ID && INVITE_LINK_REGEX.test(message.content)) {
             if (WHITELIST_USER_IDS.includes(message.author.id)) {
                 console.log(`[WHITELIST] ${message.author.tag} bebas kirim link invite.`);
             } else {
