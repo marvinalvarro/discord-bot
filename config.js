@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 console.log("PREFIX:", process.env.PREFIX);
+console.log("LEVEL_UP_CHANNEL_ID:", process.env.LEVEL_UP_CHANNEL_ID); // <-- log sementara buat debug
 
 module.exports = {
     token: process.env.TOKEN,
