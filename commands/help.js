@@ -5,7 +5,14 @@ const config = require("../config");
 const VIP_LOGS_CHANNEL_ID = "1531039427948843110";
 
 // Command yang gak mau ditampilin di daftar .help (misal command internal/testing/admin)
-const HIDDEN_COMMANDS = ["testqotd", "resetseason", "crownvoicechampions"];
+const HIDDEN_COMMANDS = [
+    "testqotd",
+    "resetseason",
+    "crownvoicechampions",
+    "resetinvites",
+    "resetallinvites",
+    "backfilldonasi",
+];
 
 // Deskripsi manual buat tiap command (opsional, biar help-nya lebih informatif)
 // Kalau ada command baru yang belum didaftarin di sini, tetep bakal muncul
@@ -51,43 +58,14 @@ module.exports = {
             .setColor(0x9b59b6)
             .setTitle("📖 DAFTAR COMMAND GAME VERSE BOT")
             .setDescription(
-                `Semua command di bawah ini bisa dipake **semua member**, gratis tanpa syarat apa-apa!\n\n` +
+                `Semua command di bawah gratis buat **semua member**!\n\n` +
                 `${commandList}\n\n` +
                 `━━━━━━━━━━━━━━━━━━━\n` +
-                `**🏆 SISTEM LEVEL & XP**\n` +
-                `Kamu **otomatis** dapat XP tanpa perlu command apapun:\n\n` +
-                `> 🎙️ **Voice XP** — dapet XP tiap menit selama kamu ada di voice channel\n` +
-                `> 💬 **Chat XP** — dapet XP tiap kirim pesan (ada jeda dikit biar gak spam)\n\n` +
-                `Pas level kamu naik, bakal ada notif otomatis muncul di channel khusus. Cek progress kapan aja pake \`${config.prefix}rank\` (voice) atau \`${config.prefix}rankchat\` (chat).\n\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `**🔥 STREAK HARIAN**\n` +
-                `Kirim pesan (teks/stiker/foto/video apapun) tiap hari di channel streak biar api kamu terus nyala!\n\n` +
-                `> 🔥 **${config.prefix}streak** — cek streak kamu sekarang\n` +
-                `> 🏆 **${config.prefix}streakleaderboard** — lihat top streak paling panjang\n\n` +
-                `Kelewat 1 hari gak kirim pesan, streak-nya reset dari 0 lagi. Jangan sampai putus ya!\n\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `**🎮 GAME & COIN**\n` +
-                `Main game buat ngumpulin **coin** (dimulai dari 100 coin gratis):\n\n` +
-                `> 🔢 **${config.prefix}tebakangka** — tebak angka lewat chat\n` +
-                `> 🧠 **${config.prefix}trivia** — kuis seputar game\n` +
-                `> 🎰 **${config.prefix}slot [taruhan]** — spin buat untung-untungan\n` +
-                `> 🃏 **${config.prefix}blackjack [taruhan]** — lawan dealer bot\n` +
-                `> 🎯 **${config.prefix}tictactoe @lawan** — 1v1 lawan temen\n\n` +
-                `Cek saldo kapan aja pake \`${config.prefix}balance\`. Semua game cuma bisa dimainkan di channel game ya!\n\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `**💬 FUN AUTO-RESPON (tanpa prefix!)**\n` +
-                `Ketik langsung salah satu kata di bawah + tag orangnya, gak perlu prefix ${config.prefix}:\n\n` +
-                `> **hy/hai/hi/halo sayang** @orang — gombalan manis\n` +
-                `> **hy/hai/hi/halo ganteng/cantik** @orang — gombalan manis\n` +
-                `> **nova pp** @orang — nampilin PP orangnya\n` +
-                `> **cium** @orang — bot ciumin orangnya\n` +
-                `> **pap / mana pap** @orang — kirim PAP orangnya\n\n` +
-                `Contoh: \`hy sayang @moon\`\n\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `**🤖 CHAT SAMA SAYA (NOVA VERSE)**\n` +
-                `Mau ngobrol bebas / nanya-nanya ke bot? Tinggal **mention** bot ini terus tulis pertanyaan lu.\n\n` +
-                `🔒 Fitur ini khusus buat **Server Booster** atau role **VIP** ya! Kalau lu belum booster/VIP, lu tetep bisa pake command-command di atas kok, cuma chat AI bebasnya aja yang di-lock.\n\n` +
-                `Mau akses AI-nya? Boost server ini, **atau** donasi VIP di https://saweria.co/marvinalvarro (link juga ada di bio founder @marvinalvarro). Abis transfer, bisa di lihat di <#${VIP_LOGS_CHANNEL_ID}> ya, nanti role VIP bakal di-assign manual sama admin 😉`
+                `🏆 **XP OTOMATIS** — dapet XP dari voice & chat. Cek pake \`${config.prefix}rank\` / \`${config.prefix}rankchat\`.\n\n` +
+                `🔥 **STREAK** — kirim 1 pesan/hari di channel streak biar api gak padam. \`${config.prefix}streak\` • \`${config.prefix}streakleaderboard\`\n\n` +
+                `🎮 **GAME & COIN** — \`${config.prefix}tebakangka\` \`${config.prefix}trivia\` \`${config.prefix}slot\` \`${config.prefix}blackjack\` \`${config.prefix}tictactoe\`. Cek saldo: \`${config.prefix}balance\`\n\n` +
+                `💬 **AUTO-RESPON** (tanpa prefix) — ketik + tag orangnya: \`hy/hai sayang\`, \`hy ganteng/cantik\`, \`nova pp\`, \`cium\`, \`pap\`\n\n` +
+                `🤖 **CHAT SAMA NOVA** — mention bot ini + tulis pertanyaan. 🔒 Khusus **Booster/VIP**. Donasi: saweria.co/marvinalvarro, cek di <#${VIP_LOGS_CHANNEL_ID}>`
             )
             .setFooter({ text: `Total: ${client.commands.size} command tersedia` });
 

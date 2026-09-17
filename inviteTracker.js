@@ -195,6 +195,38 @@ async function resetUserInvites(guild, userId) {
     return { previousCount, removedRoles };
 }
 
+/**
+ * Reset invite valid SEMUA member ke 0, DAN cabut semua role tier invite dari SEMUA member.
+ * @returns {{ strippedCount: number }}
+ */
+async function resetAllInvites(guild) {
+    // Reset semua data invite ke kosong
+    saveData({});
+
+    const allTierRoleIds = INVITE_TIERS.map((t) => t.roleId).filter(Boolean);
+    let strippedCount = 0;
+
+    if (allTierRoleIds.length > 0) {
+        const members = await guild.members.fetch();
+
+        for (const member of members.values()) {
+            const rolesToRemove = allTierRoleIds.filter((id) => member.roles.cache.has(id));
+            if (rolesToRemove.length > 0) {
+                try {
+                    await member.roles.remove(rolesToRemove);
+                    strippedCount++;
+                } catch (err) {
+                    console.error(`[inviteTracker] Gagal cabut role dari ${member.user.tag}:`, err.message);
+                }
+            }
+        }
+    }
+
+    console.log(`[inviteTracker] Semua invite di-reset. ${strippedCount} member di-strip role.`);
+
+    return { strippedCount };
+}
+
 module.exports = {
     loadData,
     saveData,
@@ -205,5 +237,6 @@ module.exports = {
     initInviteCache,
     handleMemberJoin,
     resetUserInvites,
+    resetAllInvites,
     INVITE_TIERS,
 };
