@@ -15,12 +15,7 @@ const IGNORE_IF_ALONE = false;       // true = gak dapat XP kalau sendirian di V
 const IGNORE_IF_MUTED_DEAFENED = false; // true = gak dapat XP kalau self-mute/deaf
 
 // ID user yang GAK dapat voice XP sama sekali (admin/founder), biar leaderboard murni dari member biasa
-const IGNORED_USER_IDS = [
-    "1185912082072350781",
-    "765505191570046977",
-    "1403713173273575435",
-    "1093972454705221633",
-];
+const IGNORED_USER_IDS = [];
 
 const EMBED_COLOR = 0x1ABC9C;
 const ACCENT_HEX = "#1ABC9C";
