@@ -3,6 +3,9 @@ const path = require("path");
 
 const DATA_PATH = path.join(__dirname, "inviteData.json");
 
+// Thread/channel tempat notif "X telah di invite oleh Y" otomatis dikirim
+const INVITE_LOG_CHANNEL_ID = "1550253973636784139";
+
 // ====== KONFIGURASI TIER & ROLE PER JUMLAH INVITE ======
 // Urutan HARUS dari invite terkecil ke terbesar.
 // Isi roleId dengan ID role Discord (klik kanan role > Copy Role ID, aktifkan Developer Mode dulu kalau perlu).
@@ -139,12 +142,57 @@ async function handleMemberJoin(member) {
 
     console.log(`[inviteTracker] ${usedInvite.inviter.tag} dapat +1 invite valid (total: ${user.validInvites})`);
 
+    // Kirim notif otomatis ke thread log invite
+    try {
+        const logChannel = guild.channels.cache.get(INVITE_LOG_CHANNEL_ID);
+        if (logChannel && logChannel.isTextBased()) {
+            await logChannel.send(
+                `${member} telah di invite oleh <@${inviterId}>. Sekarang memiliki jumlah **${user.validInvites}** invites.`
+            );
+        } else {
+            console.log("[inviteTracker] Channel log invite gak ketemu, cek INVITE_LOG_CHANNEL_ID.");
+        }
+    } catch (err) {
+        console.error("[inviteTracker] Gagal kirim notif ke channel log invite:", err.message);
+    }
+
     try {
         const inviterMember = await guild.members.fetch(inviterId);
         await syncMemberRole(inviterMember, user.validInvites);
     } catch (err) {
         console.error("[inviteTracker] Gagal fetch member inviter buat update role:", err.message);
     }
+}
+
+/**
+ * Reset invite valid seorang user ke 0, DAN otomatis cabut semua role tier invite dari dia.
+ * @returns {{ previousCount: number, removedRoles: boolean }}
+ */
+async function resetUserInvites(guild, userId) {
+    const data = loadData();
+    const user = getUser(data, userId);
+    const previousCount = user.validInvites;
+
+    user.validInvites = 0;
+    saveData(data);
+
+    let removedRoles = false;
+    try {
+        const member = await guild.members.fetch(userId);
+        const allTierRoleIds = INVITE_TIERS.map((t) => t.roleId).filter(Boolean);
+        const rolesToRemove = allTierRoleIds.filter((id) => member.roles.cache.has(id));
+
+        if (rolesToRemove.length > 0) {
+            await member.roles.remove(rolesToRemove);
+            removedRoles = true;
+        }
+    } catch (err) {
+        console.error(`[inviteTracker] Gagal cabut role pas reset invite ${userId}:`, err.message);
+    }
+
+    console.log(`[inviteTracker] Invite ${userId} di-reset dari ${previousCount} ke 0.`);
+
+    return { previousCount, removedRoles };
 }
 
 module.exports = {
@@ -156,5 +204,6 @@ module.exports = {
     cacheGuildInvites,
     initInviteCache,
     handleMemberJoin,
+    resetUserInvites,
     INVITE_TIERS,
 };
