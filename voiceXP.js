@@ -19,7 +19,6 @@ const IGNORED_USER_IDS = [
     "1185912082072350781",
     "765505191570046977",
     "1403713173273575435",
-    "1015666814325375067",
     "1093972454705221633",
 ];
 
@@ -105,6 +104,24 @@ async function sendLevelUpCard(channel, member, newLevel, user, rank) {
     );
 }
 
+// Sama kayak fix di chatXP.js: coba cache dulu, kalau gak ketemu baru fetch
+// langsung ke API Discord. Nutup celah bug channels.cache.get() yang bisa
+// diem-diem gagal kalau channel/thread-nya belum ke-cache oleh bot.
+async function resolveLogChannel(guild, channelId) {
+    if (!channelId) return null;
+
+    let channel = guild.channels.cache.get(channelId) || null;
+    if (!channel) {
+        try {
+            channel = await guild.channels.fetch(channelId);
+        } catch (err) {
+            console.error(`[voiceXP] Gagal fetch log channel (ID: ${channelId}):`, err.message);
+            return null;
+        }
+    }
+    return channel;
+}
+
 function startVoiceXPLoop(client, config = {}) {
     const logChannelId = config.levelUpChannelId || null;
 
@@ -135,11 +152,15 @@ function startVoiceXPLoop(client, config = {}) {
                         console.log(`[voiceXP] ${member.user.tag} naik ke level ${newLevel}`);
 
                         if (logChannelId) {
-                            const logChannel = guild.channels.cache.get(logChannelId);
-                            if (logChannel && logChannel.isTextBased()) {
-                                const rank = getLeaderboardRank(data, member.id);
-                                sendLevelUpCard(logChannel, member, newLevel, user, rank);
-                            }
+                            (async () => {
+                                const logChannel = await resolveLogChannel(guild, logChannelId);
+                                if (logChannel && logChannel.isTextBased()) {
+                                    const rank = getLeaderboardRank(data, member.id);
+                                    sendLevelUpCard(logChannel, member, newLevel, user, rank);
+                                } else {
+                                    console.error(`[voiceXP] Log channel gak ketemu atau bukan text-based. ID: ${logChannelId}`);
+                                }
+                            })();
                         }
 
                         syncMemberRole(member, newLevel, VOICE_TIERS);

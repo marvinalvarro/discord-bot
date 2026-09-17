@@ -96,6 +96,25 @@ async function sendLevelUpCard(channel, author, newLevel, user, rank) {
     );
 }
 
+// Cari channel/thread tujuan notif level-up. Coba dari cache dulu (cepat),
+// kalau gak ketemu (misal thread forum yang belum pernah "keliatan" bot sejak nyala),
+// baru fetch langsung ke API Discord. Ini buat nutup celah bug: channels.cache.get()
+// doang bisa diem-diem gagal tanpa error kalau channel/thread-nya belum ke-cache.
+async function resolveTargetChannel(guild, channelId, fallbackChannel) {
+    if (!channelId) return fallbackChannel;
+
+    let channel = guild.channels.cache.get(channelId) || null;
+    if (!channel) {
+        try {
+            channel = await guild.channels.fetch(channelId);
+        } catch (err) {
+            console.error(`[chatXP] Gagal fetch channel level up (ID: ${channelId}):`, err.message);
+            return null;
+        }
+    }
+    return channel;
+}
+
 function handleChatMessage(message, config = {}) {
     if (message.author.bot) return;
     if (!message.guild) return;
@@ -118,12 +137,17 @@ function handleChatMessage(message, config = {}) {
         console.log(`[chatXP] ${message.author.tag} naik ke level chat ${newLevel}`);
 
         const channelId = config.chatLevelUpChannelId || null;
-        const targetChannel = channelId ? message.guild.channels.cache.get(channelId) : message.channel;
 
-        if (targetChannel && targetChannel.isTextBased()) {
-            const rank = getLeaderboardRank(data, userId);
-            sendLevelUpCard(targetChannel, message.author, newLevel, user, rank);
-        }
+        (async () => {
+            const targetChannel = await resolveTargetChannel(message.guild, channelId, message.channel);
+
+            if (targetChannel && targetChannel.isTextBased()) {
+                const rank = getLeaderboardRank(data, userId);
+                sendLevelUpCard(targetChannel, message.author, newLevel, user, rank);
+            } else {
+                console.error(`[chatXP] Target channel gak ketemu atau bukan text-based. ID yang dicari: ${channelId}`);
+            }
+        })();
 
         if (message.member) {
             syncMemberRole(message.member, newLevel, CHAT_TIERS);
