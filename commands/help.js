@@ -12,6 +12,22 @@ const HIDDEN_COMMANDS = [
     "resetinvites",
     "resetallinvites",
     "backfilldonasi",
+    "ultah",
+];
+
+// Command yang udah disebut di section kategori bawah (XP, Streak, Game & Coin, dll),
+// jadi gak perlu diulang lagi di daftar command utama biar gak dobel
+const CATEGORIZED_COMMANDS = [
+    "rank",
+    "rankchat",
+    "streak",
+    "streakleaderboard",
+    "tebakangka",
+    "trivia",
+    "slot",
+    "blackjack",
+    "tictactoe",
+    "balance",
 ];
 
 // Deskripsi manual buat tiap command (opsional, biar help-nya lebih informatif)
@@ -47,6 +63,7 @@ module.exports = {
     async execute(message, args, client) {
         const commandList = [...client.commands.keys()]
             .filter((name) => !HIDDEN_COMMANDS.includes(name))
+            .filter((name) => !CATEGORIZED_COMMANDS.includes(name))
             .sort()
             .map((name) => {
                 const desc = commandDescriptions[name] || "Belum ada deskripsi";
