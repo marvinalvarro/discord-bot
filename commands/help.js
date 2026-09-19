@@ -13,6 +13,9 @@ const HIDDEN_COMMANDS = [
     "resetallinvites",
     "backfilldonasi",
     "ultah",
+    "topdonatur",
+    "setultah",
+    "panduan",
 ];
 
 // Command yang udah disebut di section kategori bawah (XP, Streak, Game & Coin, dll),
