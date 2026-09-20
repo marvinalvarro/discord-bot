@@ -1,6 +1,23 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { generateKTPImage } = require("../ktpGenerator");
-const { generateTaarufCard } = require("../taarufCardGenerator");
+
+// Pengaman: cari taarufCardGenerator.js di folder utama, kalau nggak ada coba di folder events/.
+// Kalau dua-duanya nggak ada, bot TETAP jalan (tombol lain nggak ikut mati), cuma fitur CV yang gagal
+// dan alasannya dicetak jelas di Console.
+let generateTaarufCard;
+try {
+    ({ generateTaarufCard } = require("../taarufCardGenerator"));
+} catch (errRoot) {
+    try {
+        ({ generateTaarufCard } = require("./taarufCardGenerator"));
+        console.log("[TaarufCV] PERINGATAN: taarufCardGenerator.js dimuat dari folder events/. Sebaiknya taruh di folder utama.");
+    } catch (errEvents) {
+        console.log("[TaarufCV] taarufCardGenerator.js GAGAL dimuat:", errRoot.message);
+        generateTaarufCard = async () => {
+            throw new Error("taarufCardGenerator.js tidak ketemu / error saat dimuat");
+        };
+    }
+}
 const fs = require("fs");
 const path = require("path");
 
@@ -45,6 +62,41 @@ function saveRayainData(map) {
 }
 
 const rayainParticipants = loadRayainData();
+
+// ===============================
+// DATA PERMANEN BUAT TOMBOL ❤️ DI CV TA'ARUF
+// ===============================
+const CV_LOVE_DATA_PATH = path.join(__dirname, "..", "cvLoveData.json");
+
+// Format di file: { "<messageId CV>": ["userIdPengirimLove", ...] }
+// Dipakai biar satu orang cuma bisa kirim love sekali per CV (anti spam DM).
+function loadCvLoveData() {
+    try {
+        const raw = fs.readFileSync(CV_LOVE_DATA_PATH, "utf8");
+        const parsed = JSON.parse(raw);
+        const map = new Map();
+        for (const [messageId, userIds] of Object.entries(parsed)) {
+            map.set(messageId, new Set(userIds));
+        }
+        return map;
+    } catch (err) {
+        return new Map(); // file belum ada / kosong / rusak -> mulai dari kosong
+    }
+}
+
+function saveCvLoveData(map) {
+    try {
+        const obj = {};
+        for (const [messageId, userIdSet] of map.entries()) {
+            obj[messageId] = Array.from(userIdSet);
+        }
+        fs.writeFileSync(CV_LOVE_DATA_PATH, JSON.stringify(obj, null, 2));
+    } catch (err) {
+        console.log("[TaarufCV] Gagal simpan data love:", err.message);
+    }
+}
+
+const cvLoveSenders = loadCvLoveData();
 
 // Nyimpen target user (yang ulang tahun) & channel/thread, dipakai pas modal "Kirim Ucapan" disubmit.
 // Key: userId (yang lagi ngisi modal), Value: { targetUserId, channelId }
@@ -127,10 +179,18 @@ function buildModalStep2() {
     return modal2;
 }
 
+console.log("[interactionCreate] Handler tombol/modal dimuat dari:", __dirname);
+
 module.exports = {
     name: "interactionCreate",
 
     async execute(interaction, client) {
+        // Catat tiap klik tombol / submit modal (hapus 2 baris ini kalau Console sudah terlalu ramai)
+        if (interaction.isButton() || interaction.isModalSubmit()) {
+            console.log("[interaksi]", interaction.user.username, "->", interaction.customId);
+        }
+
+        try {
         // ===== Tombol "Buat KTP" diklik -> munculin modal tahap 1 =====
         if (interaction.isButton() && interaction.customId === "buat_ktp") {
             const modal = new ModalBuilder()
@@ -401,7 +461,13 @@ module.exports = {
                     .setLabel("Buat CV")
                     .setStyle(ButtonStyle.Primary);
 
-                const rowAgain = new ActionRowBuilder().addComponents(buttonAgain);
+                // Tombol ❤️: ID pemilik CV disimpan di customId, dipakai pas tombol diklik
+                const loveButton = new ButtonBuilder()
+                    .setCustomId(`cv_love|${interaction.user.id}`)
+                    .setEmoji("❤️")
+                    .setStyle(ButtonStyle.Primary);
+
+                const rowAgain = new ActionRowBuilder().addComponents(buttonAgain, loveButton);
 
                 await interaction.channel.send({
                     content: `Buat CV milik ${interaction.user}`,
@@ -416,6 +482,62 @@ module.exports = {
                 console.log("[TaarufCV] Gagal generate/kirim gambar CV:", err.message);
                 await interaction.editReply({
                     content: "❌ Gagal bikin CV, coba lagi nanti ya.",
+                });
+            }
+            return;
+        }
+
+        // ===== Tombol ❤️ di CV diklik -> kirim DM otomatis ke pemilik CV =====
+        if (interaction.isButton() && interaction.customId.startsWith("cv_love|")) {
+            const ownerId = interaction.customId.split("|")[1];
+
+            if (interaction.user.id === ownerId) {
+                await interaction.reply({
+                    content: "Hehe, ini kan CV kamu sendiri 😄",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            const messageId = interaction.message.id;
+
+            if (!cvLoveSenders.has(messageId)) {
+                cvLoveSenders.set(messageId, new Set());
+            }
+            const senders = cvLoveSenders.get(messageId);
+
+            if (senders.has(interaction.user.id)) {
+                await interaction.reply({
+                    content: "Kamu udah kirim love ke CV ini sebelumnya ❤️",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            await interaction.deferReply({ ephemeral: true });
+
+            try {
+                const owner = await client.users.fetch(ownerId);
+                const serverName = interaction.guild ? interaction.guild.name : "Game Verse";
+
+                await owner.send({
+                    content:
+                        `❤️ **Ada yang tertarik sama CV Ta'aruf kamu!**\n` +
+                        `${interaction.user} (${interaction.user.username}) ngasih love ke CV kamu di server **${serverName}**.\n` +
+                        `Lihat CV kamu: ${interaction.message.url}`,
+                });
+
+                // Baru dicatat kalau DM-nya beneran terkirim
+                senders.add(interaction.user.id);
+                saveCvLoveData(cvLoveSenders);
+
+                await interaction.editReply({
+                    content: `✅ Love kamu udah dikirim ke <@${ownerId}> lewat DM ❤️`,
+                });
+            } catch (err) {
+                console.log("[TaarufCV] Gagal kirim DM love:", err.message);
+                await interaction.editReply({
+                    content: "❌ Gagal kirim love, kemungkinan DM pemilik CV-nya lagi ditutup. Coba lagi nanti ya.",
                 });
             }
             return;
@@ -638,6 +760,18 @@ module.exports = {
             } catch (err) {
                 console.log("[setultah] Gagal kirim DM notifikasi ke admin:", err.message);
             }
+        }
+        } catch (err) {
+            // Pengaman: error apa pun yang lolos dari handler dicetak, dan user tetap dapat balasan
+            console.log("[interaksi] ERROR tak tertangkap untuk", interaction.customId, "->", err);
+            try {
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({
+                        content: "❌ Ada error di bot, coba lagi ya.",
+                        ephemeral: true,
+                    });
+                }
+            } catch (_) {}
         }
     },
 };
