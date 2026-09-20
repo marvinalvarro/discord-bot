@@ -185,8 +185,9 @@ async function generateKTPImage({
         const rawLogoBuffer = fs.readFileSync(path.join(__dirname, "logo.png"));
         const cleanLogoBuffer = await sharp(rawLogoBuffer).toFormat("png").toBuffer();
         const logo = await loadImage(cleanLogoBuffer);
-        const logoSize = 56;
-        ctx.drawImage(logo, 20, headerH / 2 - logoSize / 2, logoSize, logoSize);
+        const logoH = 46; // tinggi tetap, lebar menyesuaikan rasio asli biar gak gepeng
+        const logoW = logoH * (logo.width / logo.height);
+        ctx.drawImage(logo, 20, headerH / 2 - logoH / 2, logoW, logoH);
     } catch (err) {
         console.log("[KTP] Logo tidak ditemukan, dilewati:", err.message);
     }

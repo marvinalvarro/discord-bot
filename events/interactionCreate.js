@@ -1,5 +1,6 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { generateKTPImage } = require("../ktpGenerator");
+const { generateTaarufCard } = require("../taarufCardGenerator");
 const fs = require("fs");
 const path = require("path");
 
@@ -304,6 +305,118 @@ module.exports = {
                 });
             } finally {
                 pendingKTPData.delete(interaction.user.id);
+            }
+            return;
+        }
+
+        // ===============================
+        // ===== FITUR CV TA'ARUF =====
+        // ===============================
+
+        // ===== Tombol "Buat CV" diklik -> munculin modal isi data =====
+        if (interaction.isButton() && interaction.customId === "buat_cv_taaruf") {
+            const modal = new ModalBuilder()
+                .setCustomId("modal_cv_taaruf")
+                .setTitle("Isi Data CV Ta'aruf Kamu");
+
+            const igInput = new TextInputBuilder()
+                .setCustomId("cv_ig")
+                .setLabel("Instagram")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setMaxLength(50);
+
+            const tiktokInput = new TextInputBuilder()
+                .setCustomId("cv_tiktok")
+                .setLabel("TikTok")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setMaxLength(50);
+
+            const discordInput = new TextInputBuilder()
+                .setCustomId("cv_discord")
+                .setLabel("Discord")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setMaxLength(50);
+
+            const asalInput = new TextInputBuilder()
+                .setCustomId("asal")
+                .setLabel("Asal (Kota)")
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder("Bekasi")
+                .setRequired(true)
+                .setMaxLength(50);
+
+            const umurInput = new TextInputBuilder()
+                .setCustomId("umur")
+                .setLabel("Umur")
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder("26")
+                .setRequired(true)
+                .setMaxLength(3);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(igInput),
+                new ActionRowBuilder().addComponents(tiktokInput),
+                new ActionRowBuilder().addComponents(discordInput),
+                new ActionRowBuilder().addComponents(asalInput),
+                new ActionRowBuilder().addComponents(umurInput)
+            );
+
+            try {
+                await interaction.showModal(modal);
+            } catch (err) {
+                console.log("[TaarufCV] Gagal munculin modal:", err);
+            }
+            return;
+        }
+
+        // ===== Modal CV Ta'aruf disubmit -> generate gambar, kirim di channel yang sama =====
+        if (interaction.isModalSubmit() && interaction.customId === "modal_cv_taaruf") {
+            await interaction.deferReply({ ephemeral: true });
+
+            const ig = interaction.fields.getTextInputValue("cv_ig");
+            const discordHandle = interaction.fields.getTextInputValue("cv_discord");
+            const tiktok = interaction.fields.getTextInputValue("cv_tiktok");
+            const asal = interaction.fields.getTextInputValue("asal");
+            const umur = interaction.fields.getTextInputValue("umur");
+
+            const locationAge = `${asal}, ${umur}`;
+            const avatarURL = interaction.user.displayAvatarURL({ extension: "png", size: 256 });
+
+            try {
+                const imageBuffer = await generateTaarufCard({
+                    photoURL: avatarURL,
+                    locationAge,
+                    ig,
+                    discord: discordHandle,
+                    tiktok,
+                });
+
+                const attachment = new AttachmentBuilder(imageBuffer, { name: "cv_taaruf.png" });
+
+                const buttonAgain = new ButtonBuilder()
+                    .setCustomId("buat_cv_taaruf")
+                    .setLabel("Buat CV")
+                    .setStyle(ButtonStyle.Primary);
+
+                const rowAgain = new ActionRowBuilder().addComponents(buttonAgain);
+
+                await interaction.channel.send({
+                    content: `Buat CV milik ${interaction.user}`,
+                    files: [attachment],
+                    components: [rowAgain],
+                });
+
+                await interaction.editReply({
+                    content: "✅ CV Ta'aruf kamu berhasil dibuat!",
+                });
+            } catch (err) {
+                console.log("[TaarufCV] Gagal generate/kirim gambar CV:", err.message);
+                await interaction.editReply({
+                    content: "❌ Gagal bikin CV, coba lagi nanti ya.",
+                });
             }
             return;
         }
