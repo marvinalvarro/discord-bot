@@ -18,8 +18,12 @@ const INVITE_TIERS = [
     { count: 50, title: "GAME VERSE LEGEND", roleId: "1542460457447858176" },
 ];
 
-// Cache invite uses per guild, dipakai buat bandingin sebelum/sesudah member baru join
-const inviteCache = new Map(); // guildId -> Map(inviteCode -> uses)
+// Cache invite per guild, dipakai buat bandingin sebelum/sesudah member baru join
+// guildId -> Map(inviteCode -> { uses, inviterId, maxUses })
+const inviteCache = new Map();
+
+// Antrian proses join per guild, biar member yang join hampir bersamaan diproses satu-satu (nggak tabrakan)
+const joinQueues = new Map(); // guildId -> Promise
 
 function loadData() {
     if (!fs.existsSync(DATA_PATH)) {
@@ -78,13 +82,24 @@ async function syncMemberRole(member, count) {
     }
 }
 
-/** Simpan snapshot invite terbaru buat sebuah guild. Dipanggil pas bot ready & tiap ada invite dibuat/dihapus. */
+/** Ubah daftar invite dari Discord jadi snapshot ringan (kode -> uses, pengundang, batas pemakaian). */
+function snapshotInvites(invites) {
+    const map = new Map();
+    invites.forEach((inv) =>
+        map.set(inv.code, {
+            uses: inv.uses || 0,
+            inviterId: inv.inviter?.id || null,
+            maxUses: inv.maxUses || 0,
+        })
+    );
+    return map;
+}
+
+/** Simpan snapshot invite terbaru buat sebuah guild. Dipanggil pas bot ready. */
 async function cacheGuildInvites(guild) {
     try {
         const invites = await guild.invites.fetch();
-        const map = new Map();
-        invites.forEach((inv) => map.set(inv.code, { uses: inv.uses || 0, inviterId: inv.inviter?.id || null }));
-        inviteCache.set(guild.id, map);
+        inviteCache.set(guild.id, snapshotInvites(invites));
     } catch (err) {
         console.error(`[inviteTracker] Gagal cache invite guild ${guild.name}:`, err.message);
     }
@@ -99,10 +114,60 @@ async function initInviteCache(client) {
 }
 
 /**
- * Dipanggil dari guildMemberAdd, bandingin invite sebelum & sesudah buat cari
- * siapa yang invite-nya kepake, terus tambahin +1 invite valid ke dia.
+ * Cari invite yang kepake member baru.
+ * 1) Invite yang jumlah pemakaiannya nambah dibanding snapshot lama.
+ * 2) Kalau nggak ada: invite yang HILANG dari daftar karena batas pemakaiannya habis
+ *    (misal invite sekali-pakai, langsung dihapus Discord setelah dipakai).
  */
-async function handleMemberJoin(member) {
+function detectUsedInvite(oldMap, newInvites) {
+    for (const inv of newInvites.values()) {
+        const old = oldMap.get(inv.code);
+        const oldUses = old ? old.uses : 0;
+        if ((inv.uses || 0) > oldUses) {
+            return { code: inv.code, inviterId: inv.inviter?.id || null, source: "uses" };
+        }
+    }
+
+    const newCodes = new Set(newInvites.keys());
+    for (const [code, old] of oldMap.entries()) {
+        if (!newCodes.has(code) && old.maxUses > 0 && old.uses + 1 >= old.maxUses && old.inviterId) {
+            return { code, inviterId: old.inviterId, source: "habis" };
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Ambil channel/thread log invite. Thread yang sudah ter-archive nggak ada di cache
+ * (apalagi setelah bot restart), jadi kalau nggak ketemu di cache, di-fetch langsung dari Discord,
+ * lalu di-unarchive kalau perlu.
+ */
+async function getLogChannel(guild) {
+    let channel = guild.channels.cache.get(INVITE_LOG_CHANNEL_ID);
+
+    if (!channel) {
+        try {
+            channel = await guild.client.channels.fetch(INVITE_LOG_CHANNEL_ID);
+        } catch (err) {
+            console.error("[inviteTracker] Gagal fetch channel log invite:", err.message);
+            return null;
+        }
+    }
+
+    if (channel && typeof channel.isThread === "function" && channel.isThread() && channel.archived) {
+        try {
+            await channel.setArchived(false);
+            console.log("[inviteTracker] Thread log invite tadi ter-archive, sudah dibuka lagi.");
+        } catch (err) {
+            console.error("[inviteTracker] Gagal unarchive thread log invite (cek izin Manage Threads):", err.message);
+        }
+    }
+
+    return channel;
+}
+
+async function processMemberJoin(member) {
     const guild = member.guild;
     const oldMap = inviteCache.get(guild.id) || new Map();
 
@@ -110,41 +175,50 @@ async function handleMemberJoin(member) {
     try {
         newInvites = await guild.invites.fetch();
     } catch (err) {
-        console.error("[inviteTracker] Gagal fetch invite terbaru:", err.message);
+        console.error("[inviteTracker] Gagal fetch invite terbaru (cek izin Manage Server):", err.message);
         return;
     }
 
-    let usedInvite = null;
-    for (const inv of newInvites.values()) {
-        const old = oldMap.get(inv.code);
-        const oldUses = old ? old.uses : 0;
-        if ((inv.uses || 0) > oldUses) {
-            usedInvite = inv;
-            break;
+    const used = detectUsedInvite(oldMap, newInvites);
+
+    // Update cache. Kalau ada beberapa invite yang nambah sekaligus (beberapa orang join barengan),
+    // cuma 1 pemakaian yang dikreditkan ke member ini; sisanya dibiarin "nunggu" buat member berikutnya.
+    const newMap = snapshotInvites(newInvites);
+    if (used && used.source === "uses") {
+        for (const [code, snap] of newMap.entries()) {
+            const old = oldMap.get(code);
+            const oldUses = old ? old.uses : 0;
+            if (code === used.code) {
+                snap.uses = oldUses + 1;
+            } else if (snap.uses > oldUses) {
+                snap.uses = oldUses;
+            }
         }
     }
-
-    // Update cache buat perbandingan berikutnya
-    const newMap = new Map();
-    newInvites.forEach((inv) => newMap.set(inv.code, { uses: inv.uses || 0, inviterId: inv.inviter?.id || null }));
     inviteCache.set(guild.id, newMap);
 
-    if (!usedInvite || !usedInvite.inviter) {
-        console.log("[inviteTracker] Gak bisa deteksi invite mana yang dipake (mungkin vanity URL).");
+    if (!used || !used.inviterId) {
+        console.log(
+            `[inviteTracker] Gak bisa deteksi invite buat ${member.user?.tag || member.id} ` +
+            `(invite aktif: ${newInvites.size}). Kemungkinan vanity URL / Server Discovery / invite sekali-pakai yang dibuat setelah bot nyala.`
+        );
         return;
     }
 
-    const inviterId = usedInvite.inviter.id;
+    const inviterId = used.inviterId;
     const data = loadData();
     const user = getUser(data, inviterId);
     user.validInvites += 1;
     saveData(data);
 
-    console.log(`[inviteTracker] ${usedInvite.inviter.tag} dapat +1 invite valid (total: ${user.validInvites})`);
+    console.log(
+        `[inviteTracker] ${member.user?.tag || member.id} masuk lewat invite ${used.code} (${used.source}) ` +
+        `-> ${inviterId} dapat +1 invite valid (total: ${user.validInvites})`
+    );
 
     // Kirim notif otomatis ke thread log invite
     try {
-        const logChannel = guild.channels.cache.get(INVITE_LOG_CHANNEL_ID);
+        const logChannel = await getLogChannel(guild);
         if (logChannel && logChannel.isTextBased()) {
             await logChannel.send(
                 `${member} telah di invite oleh <@${inviterId}>. Sekarang memiliki jumlah **${user.validInvites}** invites.`
@@ -162,6 +236,17 @@ async function handleMemberJoin(member) {
     } catch (err) {
         console.error("[inviteTracker] Gagal fetch member inviter buat update role:", err.message);
     }
+}
+
+/**
+ * Dipanggil dari guildMemberAdd. Member yang join hampir bersamaan diproses berurutan lewat antrian.
+ */
+function handleMemberJoin(member) {
+    const guildId = member.guild.id;
+    const previous = joinQueues.get(guildId) || Promise.resolve();
+    const next = previous.catch(() => {}).then(() => processMemberJoin(member));
+    joinQueues.set(guildId, next);
+    return next;
 }
 
 /**
