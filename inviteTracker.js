@@ -4,7 +4,7 @@ const path = require("path");
 const DATA_PATH = path.join(__dirname, "inviteData.json");
 
 // Thread/channel tempat notif "X telah di invite oleh Y" otomatis dikirim
-const INVITE_LOG_CHANNEL_ID = "1550253973636784139";
+const INVITE_LOG_CHANNEL_ID = "1552772455662096515";
 
 // ====== KONFIGURASI TIER & ROLE PER JUMLAH INVITE ======
 // Urutan HARUS dari invite terkecil ke terbesar.
