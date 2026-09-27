@@ -5,6 +5,7 @@ const { incrementBanCounter } = require("../banCounter");
 const { handleChatMessage } = require("../chatXP");
 const { handleStreakMessage } = require("../streakTracker");
 const { handleDonationMessage } = require("../donationTracker");
+const { loadData, saveData } = require("../activityTracker");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -216,6 +217,20 @@ module.exports = {
         handleStreakMessage(message).catch((err) => {
             console.error("[streakTracker] Error:", err);
         });
+
+        // ===============================
+        // TRACKING AKTIVITAS CHAT (buat sistem push aktif / auto-cabut role New Member)
+        // ===============================
+        try {
+            const activityData = loadData();
+            const activityEntry = activityData[message.author.id];
+            if (activityEntry && !activityEntry.completed) {
+                activityEntry.lastChatAt = Date.now();
+                saveData(activityData);
+            }
+        } catch (err) {
+            console.error("[activityTracker] Error saat tracking chat:", err);
+        }
 
         // ===============================
         // AUTO RESPON + AVATAR

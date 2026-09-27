@@ -40,7 +40,7 @@ for (const file of eventFiles) {
 }
 
 // Mulai loop pemberian XP voice setelah bot online
-client.once("ready", () => {
+client.once("clientReady", () => {
     startVoiceXPLoop(client, config);
     startBackupLoop();
     startBirthdayScheduler(client);

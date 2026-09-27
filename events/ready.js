@@ -3,6 +3,7 @@ const config = require("../config");
 const { ensureBanCounterMessage } = require("../banCounter");
 const { scheduleQOTD } = require("../qotd");
 const { initInviteCache } = require("../inviteTracker");
+const { startActivityTickLoop } = require("../activityTracker");
 
 // ID channel trap, HARUS SAMA PERSIS dengan TRAP_CHANNEL_ID di events/messageCreate.js
 const TRAP_CHANNEL_ID = "1532607922431987805";
@@ -33,6 +34,9 @@ module.exports = {
 
         // Cache invite awal buat sistem invite tracking
         initInviteCache(client);
+
+        // Sistem push aktif (auto-cabut role New Member kalau total waktu aktif voice/chat 3 hari terpenuhi)
+        startActivityTickLoop(client);
 
         function getJakartaHour() {
             const jakartaTimeStr = new Date().toLocaleString("en-US", {
