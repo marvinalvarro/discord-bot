@@ -72,8 +72,11 @@ const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihand
 const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
 const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban walau chat di trap channel
 
-// Channel khusus partnership, link invite boleh di-post di sini tanpa kena auto-ban
-const PARTNERSHIP_CHANNEL_ID = "1549031435107827844";
+// Channel/thread khusus partnership, link invite boleh di-post di sini tanpa kena auto-ban
+const PARTNERSHIP_CHANNEL_IDS = [
+    "1549031435107827844", // channel partnership lama
+    "1554236127513415710", // thread partnership baru
+];
 
 // Channel anti-link/phishing: SEMUA link (bukan cuma invite Discord) bikin auto-ban, kecuali WHITELIST_USER_IDS
 const ANTI_LINK_CHANNEL_ID = "1515853805470613655";
@@ -161,7 +164,7 @@ module.exports = {
         // ===============================
         // AUTO-BAN LINK INVITE DISCORD LAIN (berlaku di SEMUA channel, KECUALI channel partnership)
         // ===============================
-        if (message.channelId !== PARTNERSHIP_CHANNEL_ID && INVITE_LINK_REGEX.test(message.content)) {
+        if (!PARTNERSHIP_CHANNEL_IDS.includes(message.channelId) && INVITE_LINK_REGEX.test(message.content)) {
             if (WHITELIST_USER_IDS.includes(message.author.id)) {
                 console.log(`[WHITELIST] ${message.author.tag} bebas kirim link invite.`);
             } else {
