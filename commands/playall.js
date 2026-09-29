@@ -7,25 +7,27 @@ module.exports = {
     async execute(message, args, client) {
         const voiceChannel = message.member.voice.channel;
         if (!voiceChannel) {
-            return message.reply("Lu harus join voice channel dulu buat muter musik!");
+            return message.reply("Lu harus join voice channel dulu buat muter musik!").catch(() => {});
         }
 
         if (!fs.existsSync(LOCAL_MUSIC_DIR)) {
-            return message.reply("Folder `music/` belum ada di server. Buat dulu foldernya, upload file mp3 ke situ.");
+            return message
+                .reply("Folder `music/` belum ada di server. Buat dulu foldernya, upload file mp3 ke situ.")
+                .catch(() => {});
         }
 
         const files = fs
             .readdirSync(LOCAL_MUSIC_DIR)
             .filter((f) => [".mp3", ".wav", ".ogg", ".m4a"].includes(path.extname(f).toLowerCase()))
-            .sort(); // urutin nama file biar konsisten urutan puternya
+            .sort();
 
         if (files.length === 0) {
-            return message.reply("Gak ada file musik di folder `music/`.");
+            return message.reply("Gak ada file musik di folder `music/`.").catch(() => {});
         }
 
         const permissions = voiceChannel.permissionsFor(client.user);
         if (!permissions.has("Connect") || !permissions.has("Speak")) {
-            return message.reply("Bot gak punya izin **Connect**/**Speak** di voice channel itu.");
+            return message.reply("Bot gak punya izin **Connect**/**Speak** di voice channel itu.").catch(() => {});
         }
 
         let queue;
@@ -33,22 +35,22 @@ module.exports = {
             queue = await connectToVoice(voiceChannel, message.channel);
         } catch (err) {
             console.error("[playall] Gagal connect voice:", err.message);
-            return message.reply("Gagal connect ke voice channel, coba lagi.");
+            return message.reply("Gagal connect ke voice channel, coba lagi.").catch(() => {});
         }
 
-        // Kosongin antrian lama, isi ulang sama semua lagu dari folder
         queue.songs = files.map((file) => ({
             title: path.parse(file).name,
             source: path.join(LOCAL_MUSIC_DIR, file),
             requestedBy: message.author.tag,
         }));
 
-        // Loop "queue" = abis lagu terakhir, otomatis balik muter dari lagu pertama lagi, terus-menerus
         queue.loopMode = "queue";
 
-        message.reply(
-            `🎶 Muter **${files.length} lagu** dari folder musik, berurutan dan bakal ngulang otomatis dari awal kalau udah abis semua.\nKetik \`.stop\` kalau mau berhentiin.`
-        );
+        message
+            .reply(
+                `🎶 Muter **${files.length} lagu** dari folder musik, berurutan dan bakal ngulang otomatis dari awal kalau udah abis semua.\nKetik \`.stop\` kalau mau berhentiin.`
+            )
+            .catch(() => {});
 
         if (!queue.playing) {
             await queue.playNext();

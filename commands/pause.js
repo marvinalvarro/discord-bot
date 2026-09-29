@@ -6,9 +6,9 @@ module.exports = {
     execute(message) {
         const queue = getQueue(message.guild.id);
         if (!queue || queue.player.state.status !== AudioPlayerStatus.Playing) {
-            return message.reply("Gak ada lagu yang lagi diputer.");
+            return message.reply("Gak ada lagu yang lagi diputer.").catch(() => {});
         }
         queue.player.pause();
-        message.reply("⏸️ Musik di-pause. Ketik `.resume` buat lanjutin.");
+        message.reply("⏸️ Musik di-pause. Ketik `.resume` buat lanjutin.").catch(() => {});
     },
 };
