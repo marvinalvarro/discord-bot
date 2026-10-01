@@ -67,7 +67,7 @@ async function generateContentWithRetry(text) {
 // KONFIGURASI AUTO-BAN LINK INVITE DISCORD LAIN
 // ===============================
 const INVITE_LINK_REGEX = /(discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9-]+/i;
-const INVITE_BAN_REASON = "Auto-ban: mengirim link invite server Discord lain (indikasi member poaching)";
+const INVITE_BAN_REASON = "Auto-ban: mengirim link invite Discord tanpa izin staff";
 const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
 const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
 const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";

@@ -28,9 +28,15 @@ async function handleFriendStreakMessage(message) {
     if (!message.guild) return;
     if (message.mentions.everyone) return;
 
-    const mentionedUsers = message.mentions.users.filter(
-        (u) => !u.bot && u.id !== message.author.id
-    );
+    // Cuma hitung mention yang BENERAN diketik eksplisit di teks pesan (ada tag <@id> di content).
+    // Ini buat nyaring efek "reply" Discord, yang otomatis nambahin orang ke daftar mentions
+    // walau orangnya gak sengaja ngetik @nama, cuma klik tombol Reply doang.
+    const mentionedUsers = message.mentions.users.filter((u) => {
+        if (u.bot || u.id === message.author.id) return false;
+        const explicitlyTagged =
+            message.content.includes(`<@${u.id}>`) || message.content.includes(`<@!${u.id}>`);
+        return explicitlyTagged;
+    });
 
     if (mentionedUsers.size === 0) return;
 

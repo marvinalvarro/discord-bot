@@ -16,6 +16,16 @@ const HIDDEN_COMMANDS = [
     "topdonatur",
     "setultah",
     "panduan",
+    // Command musik, gak ditampilin di help sama sekali
+    "loop",
+    "pause",
+    "play",
+    "playall",
+    "queue",
+    "resume",
+    "skip",
+    "stop",
+    "volume",
 ];
 
 // Command yang udah disebut di section kategori bawah (XP, Streak, Game & Coin, dll),
@@ -83,12 +93,13 @@ module.exports = {
                 `━━━━━━━━━━━━━━━━━━━\n` +
                 `🏆 **XP OTOMATIS** — dapet XP dari voice & chat. Cek pake \`${config.prefix}rank\` / \`${config.prefix}rankchat\`.\n\n` +
                 `🔥 **STREAK** — kirim 1 pesan/hari di channel streak biar api gak padam. \`${config.prefix}streak\` • \`${config.prefix}streakleaderboard\`\n\n` +
+                `🔥 **FRIEND STREAK** — tag temen kamu di chat apapun (teks/foto/video, bebas), terus dia bales chat + tag balik kamu di hari yang sama → streak kalian jalan! Kelewat sehari tanpa saling tag, streak-nya reset.\n\n` +
                 `🎮 **GAME & COIN** — \`${config.prefix}tebakangka\` \`${config.prefix}trivia\` \`${config.prefix}slot\` \`${config.prefix}blackjack\` \`${config.prefix}tictactoe\`. Cek saldo: \`${config.prefix}balance\`\n\n` +
                 `💬 **AUTO-RESPON** (tanpa prefix) — ketik + tag orangnya: \`hy/hai sayang\`, \`hy ganteng/cantik\`, \`nova pp\`, \`cium\`, \`pap\`\n\n` +
                 `🤖 **CHAT SAMA NOVA** — mention bot ini + tulis pertanyaan. 🔒 Khusus **Booster/VIP**. Donasi: saweria.co/marvinalvarro, cek di <#${VIP_LOGS_CHANNEL_ID}>`
             )
             .setFooter({ text: `Total: ${client.commands.size} command tersedia` });
 
-        await message.reply({ embeds: [embed] });
+        await message.reply({ embeds: [embed] }).catch(() => {});
     },
 };
