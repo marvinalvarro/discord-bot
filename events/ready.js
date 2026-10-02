@@ -4,6 +4,7 @@ const { ensureBanCounterMessage } = require("../banCounter");
 const { scheduleQOTD } = require("../qotd");
 const { initInviteCache } = require("../inviteTracker");
 const { startActivityTickLoop } = require("../activityTracker");
+const { startYoutubeLiveLoop } = require("../youtubeLiveTracker");
 
 // ID channel trap, HARUS SAMA PERSIS dengan TRAP_CHANNEL_ID di events/messageCreate.js
 const TRAP_CHANNEL_ID = "1532607922431987805";
@@ -37,6 +38,9 @@ module.exports = {
 
         // Sistem push aktif (auto-cabut role New Member kalau total waktu aktif voice/chat 3 hari terpenuhi)
         startActivityTickLoop(client);
+
+        // Notif otomatis kalau channel YouTube yang dipantau lagi live streaming
+        startYoutubeLiveLoop(client);
 
         function getJakartaHour() {
             const jakartaTimeStr = new Date().toLocaleString("en-US", {

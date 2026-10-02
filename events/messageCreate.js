@@ -67,10 +67,10 @@ async function generateContentWithRetry(text) {
 // KONFIGURASI AUTO-BAN LINK INVITE DISCORD LAIN
 // ===============================
 const INVITE_LINK_REGEX = /(discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9-]+/i;
-const INVITE_BAN_REASON = "Auto-ban: mengirim link invite Discord tanpa izin staff";
+const INVITE_BAN_REASON = "Auto ban: mengirim link invite Discord tanpa izin staff";
 const TRAP_CHANNEL_ID = "1532607922431987805";   // ID channel trap (#dilarang-chat)
 const LOG_CHANNEL_ID = "";       // dikosongin, karena notif ban sekarang dihandle guildBanAdd.js
-const BAN_REASON = "Auto-ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
+const BAN_REASON = "Auto ban: mengirim pesan di trap channel (terdeteksi spam/phishing bot)";
 const WHITELIST_USER_IDS = ["1015666814325375067"]; // founder, gak akan ke-ban walau chat di trap channel
 
 // Channel/thread khusus partnership, link invite boleh di-post di sini tanpa kena auto-ban

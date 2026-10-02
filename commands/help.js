@@ -12,10 +12,13 @@ const HIDDEN_COMMANDS = [
     "resetinvites",
     "resetallinvites",
     "backfilldonasi",
+    "ktp",
     "ultah",
     "topdonatur",
     "setultah",
     "panduan",
+    "taaruf",
+    "testlive",
     // Command musik, gak ditampilin di help sama sekali
     "loop",
     "pause",
