@@ -24,6 +24,9 @@ const path = require("path");
 // Channel khusus buat nampilin hasil KTP
 const KTP_CHANNEL_ID = "1534281400826728448";
 
+// Role yang otomatis dikasih begitu KTP berhasil dibuat
+const KTP_ROLE_ID = "1536324881786994771";
+
 // Nyimpen sementara data dari modal tahap 1, sambil nunggu user isi modal tahap 2.
 // Key: userId, Value: { nama, ttl, jk, golda, agama }
 const pendingKTPData = new Map();
@@ -334,6 +337,22 @@ module.exports = {
 
                 const attachment = new AttachmentBuilder(imageBuffer, { name: "ktp.png" });
 
+                // ===== Auto-role: kasih role begitu KTP berhasil dibuat =====
+                let roleGiven = false;
+                try {
+                    const ktpRole = interaction.guild.roles.cache.get(KTP_ROLE_ID);
+                    if (ktpRole) {
+                        if (!interaction.member.roles.cache.has(KTP_ROLE_ID)) {
+                            await interaction.member.roles.add(ktpRole);
+                        }
+                        roleGiven = true;
+                    } else {
+                        console.log("[KTP] Role KTP tidak ditemukan, cek KTP_ROLE_ID:", KTP_ROLE_ID);
+                    }
+                } catch (roleErr) {
+                    console.log("[KTP] Gagal kasih role KTP:", roleErr.message);
+                }
+
                 const ktpChannel = interaction.guild.channels.cache.get(KTP_CHANNEL_ID);
 
                 if (ktpChannel) {
@@ -350,7 +369,7 @@ module.exports = {
                         components: [rowAgain],
                     });
                     await interaction.editReply({
-                        content: `✅ KTP kamu berhasil dibuat! Cek di <#${KTP_CHANNEL_ID}>`,
+                        content: `✅ KTP kamu berhasil dibuat! Cek di <#${KTP_CHANNEL_ID}>${roleGiven ? " — role warga ber-KTP udah otomatis kamu dapetin juga 🎉" : ""}`,
                     });
                 } else {
                     console.log("[KTP] Channel KTP tidak ditemukan, cek ID:", KTP_CHANNEL_ID);
