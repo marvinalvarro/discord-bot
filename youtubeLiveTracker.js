@@ -29,20 +29,51 @@ function saveData(data) {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 }
 
-// Ambil daftar video ID terbaru dari RSS feed publik YouTube (gratis, gak pake kuota API sama sekali)
-async function getLatestVideoIds(channelId) {
-    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`RSS feed gagal diambil (status ${res.status})`);
-    const xml = await res.text();
+// Channel yang RSS-nya sudah pernah diumumin gagal (biar log gak ke-spam tiap 3 menit)
+const rssWarned = new Set();
 
-    const ids = [];
-    const regex = /<yt:videoId>([^<]+)<\/yt:videoId>/g;
-    let match;
-    while ((match = regex.exec(xml)) !== null) {
-        ids.push(match[1]);
+// Ambil daftar video ID terbaru dari sebuah channel.
+// 1) Coba RSS publik YouTube dulu (gratis, 0 kuota API).
+// 2) Kalau RSS gagal (YouTube kadang ngasih 404 acak ke IP server hosting),
+//    otomatis pindah ke playlist "uploads" lewat API key (cuma 1 unit kuota per panggilan).
+async function getLatestVideoIds(channelId, apiKey) {
+    try {
+        const res = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; NovaVerseBot/1.0)" },
+        });
+        if (res.ok) {
+            const xml = await res.text();
+            const ids = [];
+            const regex = /<yt:videoId>([^<]+)<\/yt:videoId>/g;
+            let match;
+            while ((match = regex.exec(xml)) !== null) {
+                ids.push(match[1]);
+            }
+            if (ids.length > 0) return ids.slice(0, 5);
+        } else if (!rssWarned.has(channelId)) {
+            rssWarned.add(channelId);
+            console.log(`[youtubeLiveTracker] RSS ${channelId} gagal (status ${res.status}), pindah ke API cadangan.`);
+        }
+    } catch (err) {
+        if (!rssWarned.has(channelId)) {
+            rssWarned.add(channelId);
+            console.log(`[youtubeLiveTracker] RSS ${channelId} error (${err.message}), pindah ke API cadangan.`);
+        }
     }
-    return ids.slice(0, 5); // ambil 5 video/stream terbaru aja, cukup buat deteksi live
+
+    // Cadangan: playlist uploads. ID-nya selalu sama dengan channelId, cuma awalan "UC" diganti "UU".
+    if (!channelId.startsWith("UC")) {
+        throw new Error(`channelId "${channelId}" bukan format UC..., gak bisa dipakai buat cadangan`);
+    }
+    const uploadsId = "UU" + channelId.slice(2);
+    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploadsId}&maxResults=5&key=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`API cadangan gagal (status ${res.status}): ${body}`);
+    }
+    const json = await res.json();
+    return (json.items || []).map((i) => i.contentDetails.videoId);
 }
 
 // Cek status live dari beberapa video ID sekaligus (1 request = 1 unit kuota, gak peduli berapa ID-nya)
@@ -166,7 +197,7 @@ async function checkChannel(client, channelConfig, apiKey, data) {
         data[channelId].isLive = !!data[channelId].lastAnnouncedVideoId;
     }
 
-    const videoIds = await getLatestVideoIds(channelId);
+    const videoIds = await getLatestVideoIds(channelId, apiKey);
     const videos = await getLiveVideoDetails(videoIds, apiKey);
 
     const liveVideo = videos.find((v) => v.snippet?.liveBroadcastContent === "live");

@@ -61,3 +61,6 @@ client.once("clientReady", () => {
 });
 
 client.login(config.token);
+
+// Jalanin bot Platform di proses yang sama
+require("./platformBot");
