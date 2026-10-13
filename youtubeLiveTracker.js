@@ -32,6 +32,10 @@ function saveData(data) {
 // Channel yang RSS-nya sudah pernah diumumin gagal (biar log gak ke-spam tiap 3 menit)
 const rssWarned = new Set();
 
+// Channel yang error-nya (RSS + API cadangan sama-sama gagal) sudah pernah dicatat.
+// Dihapus lagi begitu channel itu normal, biar kalau error lagi nanti tetap dicatat sekali.
+const errorWarned = new Set();
+
 // Ambil daftar video ID terbaru dari sebuah channel.
 // 1) Coba RSS publik YouTube dulu (gratis, 0 kuota API).
 // 2) Kalau RSS gagal (YouTube kadang ngasih 404 acak ke IP server hosting),
@@ -49,7 +53,10 @@ async function getLatestVideoIds(channelId, apiKey) {
             while ((match = regex.exec(xml)) !== null) {
                 ids.push(match[1]);
             }
-            if (ids.length > 0) return ids.slice(0, 5);
+            if (ids.length > 0) {
+                rssWarned.delete(channelId); // RSS pulih, boleh dicatat lagi kalau gagal nanti
+                return ids.slice(0, 5);
+            }
         } else if (!rssWarned.has(channelId)) {
             rssWarned.add(channelId);
             console.log(`[youtubeLiveTracker] RSS ${channelId} gagal (status ${res.status}), pindah ke API cadangan.`);
@@ -244,11 +251,17 @@ async function checkAllChannels(client) {
             await checkChannel(client, channelConfig, apiKey, data);
             const after = JSON.stringify(data[channelConfig.channelId]);
             if (before !== after) changed = true;
+
+            if (errorWarned.delete(channelConfig.channelId)) {
+                console.log(`[youtubeLiveTracker] Channel ${channelConfig.label || channelConfig.channelId} sudah normal lagi.`);
+            }
         } catch (err) {
-            console.error(
-                `[youtubeLiveTracker] Error cek channel ${channelConfig.label || channelConfig.channelId}:`,
-                err.message
-            );
+            if (!errorWarned.has(channelConfig.channelId)) {
+                errorWarned.add(channelConfig.channelId);
+                console.error(
+                    `[youtubeLiveTracker] Error cek channel ${channelConfig.label || channelConfig.channelId}: ${err.message} (error berikutnya disembunyikan sampai pulih)`
+                );
+            }
         }
     }
 

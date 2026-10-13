@@ -7,6 +7,7 @@ const { handleStreakMessage } = require("../streakTracker");
 const { handleDonationMessage } = require("../donationTracker");
 const { loadData, saveData } = require("../activityTracker");
 const { handleFriendStreakMessage } = require("../friendStreakTracker");
+const { handleRemoveBgMessage } = require("../removeBgChannel");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -220,6 +221,13 @@ module.exports = {
         // ===============================
         handleStreakMessage(message).catch((err) => {
             console.error("[streakTracker] Error:", err);
+        });
+
+        // ===============================
+        // AUTO REMOVE BG (channel khusus, tanpa command)
+        // ===============================
+        handleRemoveBgMessage(message).catch((err) => {
+            console.error("[removeBgChannel] Error:", err);
         });
 
         // ===============================
