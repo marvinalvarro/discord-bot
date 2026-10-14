@@ -23,6 +23,7 @@
     "play-dl": "^1.9.7",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.2",
+    "tiktok-live-connector": "^2.5.0",
     "tweetnacl": "^1.0.3"
   }
 }
