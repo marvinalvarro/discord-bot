@@ -1,15 +1,26 @@
-const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require("discord.js");
+const fs = require("fs");
+const path = require("path");
+const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, AttachmentBuilder } = require("discord.js");
 const { generateBirthdayCard } = require("./birthdayCardGenerator");
 
 // Pesan ucapan ulang tahun
 const BIRTHDAY_MESSAGE = "Semoga di umur yang baru ini kamu selalu diberikan kesehatan, kebahagiaan, dan keberuntungan.\nSemoga semua yang kamu harapkan dan perjuangkan bisa perlahan terwujud. Tetap jadi versi terbaik dari diri kamu, dan semoga tahun ini membawa banyak hal baik buat kamu. 🤍✨";
 
-// Beberapa GIF ulang tahun, dipilih random biar gak monoton
-// Catatan: link Discord CDN di bawah ini punya masa berlaku (ada parameter ?ex=...),
-// jadi kalau suatu saat GIF-nya berhenti muncul, upload ulang dan ganti link-nya.
-const BIRTHDAY_GIFS = [
-    "https://cdn.discordapp.com/attachments/1477893248226820188/1546348992441487370/download.gif?ex=6a9f7539&is=6a9e23b9&hm=398a0995e48cbf632bf3118afdbd49b297f676ef12bf4c28f36e80ac79743536&",
-];
+// GIF ulang tahun disimpan sebagai FILE di folder "birthdayGifs" (sejajar file ini),
+// bukan link Discord CDN, karena link CDN bisa kedaluwarsa. Taruh 1 atau lebih file
+// (.gif/.png/.jpg/.webp) di situ, nanti dipilih random tiap kirim ucapan.
+const GIF_DIR = path.join(__dirname, "birthdayGifs");
+
+function pickRandomGif() {
+    try {
+        const list = fs.readdirSync(GIF_DIR).filter((f) => /\.(gif|png|jpe?g|webp)$/i.test(f));
+        if (list.length === 0) return null;
+        const file = list[Math.floor(Math.random() * list.length)];
+        return { filePath: path.join(GIF_DIR, file), ext: path.extname(file).toLowerCase() };
+    } catch (err) {
+        return null; // folder belum ada
+    }
+}
 
 /**
  * Kirim pesan ulang tahun lengkap (kartu + GIF + tombol interaktif + thread) ke sebuah channel.
@@ -20,8 +31,6 @@ const BIRTHDAY_GIFS = [
  * @returns {Promise<import("discord.js").Message|null>}
  */
 async function sendBirthdayMessage(channel, user) {
-    const randomGif = BIRTHDAY_GIFS[Math.floor(Math.random() * BIRTHDAY_GIFS.length)];
-
     const embeds = [];
     const files = [];
 
@@ -54,12 +63,19 @@ async function sendBirthdayMessage(channel, user) {
         );
     }
 
-    // Embed kedua khusus buat GIF
-    embeds.push(
-        new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setImage(randomGif)
-    );
+    // Embed kedua khusus buat GIF (di-upload dari file lokal, jadi gak bisa kedaluwarsa)
+    const gif = pickRandomGif();
+    if (gif) {
+        const gifName = `birthday_gif${gif.ext}`;
+        files.push(new AttachmentBuilder(gif.filePath, { name: gifName }));
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setImage(`attachment://${gifName}`)
+        );
+    } else {
+        console.log("[birthdaySender] Folder birthdayGifs kosong / belum ada, pesan dikirim tanpa GIF.");
+    }
 
     // Tombol interaktif: Ikut Rayain (counter) + Kirim Ucapan Juga (modal)
     const rayainButton = new ButtonBuilder()

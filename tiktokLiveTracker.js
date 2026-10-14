@@ -78,6 +78,75 @@ async function fetchIsLive(username) {
     return !!result;
 }
 
+// Ambil 1 URL gambar dari berbagai bentuk data TikTok (string / {url_list:[...]} / {urlList:[...]} / {url})
+function pickUrl(obj) {
+    if (!obj) return null;
+    if (typeof obj === "string") return obj.startsWith("http") ? obj : null;
+    const list = obj.url_list || obj.urlList;
+    if (Array.isArray(list) && list.length > 0) {
+        return list.find((u) => typeof u === "string" && u.startsWith("https")) || list[0] || null;
+    }
+    if (typeof obj.url === "string") return obj.url;
+    return null;
+}
+
+// Ambil judul + cover + avatar dari data room TikTok (dibuat longgar karena struktur data bisa beda antar versi)
+function extractLiveInfo(raw) {
+    const room = (raw && raw.data && typeof raw.data === "object" && !Array.isArray(raw.data) ? raw.data : raw) || {};
+    const owner = room.owner || room.user || {};
+
+    const title = typeof room.title === "string" && room.title.trim() ? room.title.trim() : null;
+    const coverUrl =
+        pickUrl(room.cover) ||
+        pickUrl(room.coverUrl) ||
+        pickUrl(room.cover_url) ||
+        pickUrl(room.feed_room_label) ||
+        null;
+    const avatarUrl =
+        pickUrl(owner.avatar_large) ||
+        pickUrl(owner.avatarLarge) ||
+        pickUrl(owner.avatar_medium) ||
+        pickUrl(owner.avatarMedium) ||
+        pickUrl(owner.avatar_thumb) ||
+        pickUrl(owner.avatarThumb) ||
+        null;
+
+    return { title, coverUrl, avatarUrl, keys: Object.keys(room) };
+}
+
+const infoWarned = new Set();
+
+// Gagal ambil info TIDAK boleh menggagalkan notif; kalau gagal, notif tetap dikirim tanpa gambar.
+async function fetchLiveInfo(username) {
+    try {
+        const { TikTokLiveConnection } = await getLib();
+        let conn = connections.get(username);
+        if (!conn) {
+            conn = new TikTokLiveConnection(username, { processInitialData: false });
+            connections.set(username, conn);
+        }
+        const raw = await Promise.race([
+            conn.fetchRoomInfo(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), CHECK_TIMEOUT_MS)),
+        ]);
+        const info = extractLiveInfo(raw);
+
+        if ((!info.coverUrl || !info.avatarUrl) && !infoWarned.has(username)) {
+            infoWarned.add(username);
+            console.log(
+                `[tiktokLiveTracker] Info live ${username}: cover ${info.coverUrl ? "ada" : "TIDAK ada"}, avatar ${info.avatarUrl ? "ada" : "TIDAK ada"}. Key data room: ${info.keys.join(", ")}`
+            );
+        }
+        return info;
+    } catch (err) {
+        if (!infoWarned.has(username)) {
+            infoWarned.add(username);
+            console.log(`[tiktokLiveTracker] Gagal ambil info live ${username} (notif tetap dikirim tanpa gambar): ${err.message}`);
+        }
+        return null;
+    }
+}
+
 async function getDiscordTarget(client, discordChannelId, label) {
     let channel = client.channels.cache.get(discordChannelId);
 
@@ -101,20 +170,26 @@ async function getDiscordTarget(client, discordChannelId, label) {
     return channel;
 }
 
-async function sendLiveAnnouncement(client, cfg) {
+async function sendLiveAnnouncement(client, cfg, info) {
     const label = cfg.label || cfg.username;
     const url = `https://www.tiktok.com/@${cfg.username}/live`;
 
     const discordChannel = await getDiscordTarget(client, cfg.discordChannelId, label);
     if (!discordChannel) return { sent: false, discordChannel: null };
 
+    const authorData = { name: `${label} sedang LIVE di TikTok!` };
+    if (info?.avatarUrl) authorData.iconURL = info.avatarUrl;
+
     const embed = new EmbedBuilder()
         .setColor(0xFE2C55)
-        .setAuthor({ name: `${label} sedang LIVE di TikTok!` })
-        .setTitle("Klik di sini buat nonton")
+        .setAuthor(authorData)
+        .setTitle(info?.title || "Klik di sini buat nonton")
         .setURL(url)
         .setDescription(`@${cfg.username}`)
         .setTimestamp();
+
+    if (info?.coverUrl) embed.setImage(info.coverUrl);
+    else if (info?.avatarUrl) embed.setThumbnail(info.avatarUrl);
 
     try {
         await discordChannel.send({
@@ -165,7 +240,8 @@ async function checkUser(client, cfg, data) {
         if (state.isLive) return; // udah live dari tadi
 
         // ===== BARU MULAI LIVE =====
-        const { sent, discordChannel } = await sendLiveAnnouncement(client, cfg);
+        const info = await fetchLiveInfo(cfg.username);
+        const { sent, discordChannel } = await sendLiveAnnouncement(client, cfg, info);
         await setLiveRole(discordChannel, cfg, true);
         if (sent || discordChannel) state.isLive = true;
     } else {
@@ -230,4 +306,4 @@ function startTiktokLiveLoop(client) {
     console.log(`[tiktokLiveTracker] Loop aktif (cek tiap ${CHECK_INTERVAL_MS / 1000 / 60} menit).`);
 }
 
-module.exports = { startTiktokLiveLoop, checkAll };
+module.exports = { startTiktokLiveLoop, checkAll, extractLiveInfo };
