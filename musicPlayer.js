@@ -13,12 +13,26 @@ const path = require("path");
 // Folder tempat kamu upload file musik lokal (mp3/wav/ogg/m4a). Buat folder ini di root project kalau belum ada.
 const LOCAL_MUSIC_DIR = path.join(__dirname, "music");
 
-// Map<guildId, GuildMusicQueue>
+// Map<queueKey, GuildMusicQueue>
 const queues = new Map();
 
+// Tiap bot punya "namespace" sendiri supaya antrian & koneksi voice-nya gak bentrok.
+// - Bot utama (Nova Verse): tanpa namespace -> key = guildId (sama persis seperti sebelumnya,
+//   jadi command lama yang pakai getQueue(guildId) / queues.get(guildId) tetap aman).
+// - Bot lain (GV Platform): client.musicNamespace = "platform" -> key = "platform:guildId".
+function namespaceOf(client) {
+    return (client && client.musicNamespace) || null;
+}
+
+function queueKey(guildId, namespace) {
+    return namespace ? `${namespace}:${guildId}` : guildId;
+}
+
 class GuildMusicQueue {
-    constructor(guildId, textChannel) {
+    constructor(guildId, textChannel, namespace = null) {
         this.guildId = guildId;
+        this.namespace = namespace;
+        this.key = queueKey(guildId, namespace);
         this.textChannel = textChannel;
         this.connection = null;
         this.player = createAudioPlayer({
@@ -90,33 +104,41 @@ class GuildMusicQueue {
                 // koneksi mungkin udah ke-destroy duluan, aman diabaikan
             }
         }
-        queues.delete(this.guildId);
+        queues.delete(this.key);
     }
 }
 
-function getQueue(guildId) {
-    return queues.get(guildId);
+// namespace kosong = bot utama (Nova Verse). Untuk GV Platform pakai getQueue(guildId, "platform").
+function getQueue(guildId, namespace = null) {
+    return queues.get(queueKey(guildId, namespace));
 }
 
 async function connectToVoice(voiceChannel, textChannel) {
-    let queue = queues.get(voiceChannel.guild.id);
+    const guild = voiceChannel.guild;
+    // Bot mana yang dipakai ditentukan otomatis dari guild.client (bot yang punya voice channel ini)
+    const namespace = namespaceOf(guild.client);
+    const key = queueKey(guild.id, namespace);
+
+    let queue = queues.get(key);
     if (!queue) {
-        queue = new GuildMusicQueue(voiceChannel.guild.id, textChannel);
-        queues.set(voiceChannel.guild.id, queue);
+        queue = new GuildMusicQueue(guild.id, textChannel, namespace);
+        queues.set(key, queue);
     }
 
     if (!queue.connection) {
         const connection = joinVoiceChannel({
             channelId: voiceChannel.id,
-            guildId: voiceChannel.guild.id,
-            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator,
+            // "group" memisahkan koneksi tiap bot. Tanpa ini, 2 bot di 1 proses saling pakai koneksi.
+            group: namespace || "default",
         });
 
         try {
             await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
         } catch (err) {
             connection.destroy();
-            queues.delete(voiceChannel.guild.id);
+            queues.delete(key);
             throw new Error("Gagal connect ke voice channel (timeout).");
         }
 
@@ -151,4 +173,6 @@ module.exports = {
     resolveSong,
     GuildMusicQueue,
     LOCAL_MUSIC_DIR,
+    queueKey,
+    namespaceOf,
 };
