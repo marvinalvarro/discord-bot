@@ -99,7 +99,7 @@ module.exports = {
                 `🔥 **FRIEND STREAK** — tag temen kamu di chat apapun (teks/foto/video, bebas), terus dia bales chat + tag balik kamu di hari yang sama → streak kalian jalan! Kelewat sehari tanpa saling tag, streak-nya reset.\n\n` +
                 `🎮 **GAME & COIN** — \`${config.prefix}tebakangka\` \`${config.prefix}trivia\` \`${config.prefix}slot\` \`${config.prefix}blackjack\` \`${config.prefix}tictactoe\`. Cek saldo: \`${config.prefix}balance\`\n\n` +
                 `💬 **AUTO-RESPON** (tanpa prefix) — ketik + tag orangnya: \`hy/hai sayang\`, \`hy ganteng/cantik\`, \`nova pp\`, \`cium\`, \`pap\`\n\n` +
-                `🤖 **CHAT SAMA NOVA** — mention bot ini + tulis pertanyaan. 🔒 Khusus **Booster/VIP**. Donasi: saweria.co/marvinalvarro, cek di <#${VIP_LOGS_CHANNEL_ID}>`
+                `🤖 **CHAT SAMA NOVA** — mention bot ini + tulis pertanyaan. 🔒 Khusus **Booster/VIP**. Donasi: saweria.co/marvina, cek di <#${VIP_LOGS_CHANNEL_ID}>`
             )
             .setFooter({ text: `Total: ${client.commands.size} command tersedia` });
 
