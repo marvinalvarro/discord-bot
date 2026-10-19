@@ -64,3 +64,7 @@ client.login(config.token);
 
 // Jalanin bot Platform di proses yang sama
 require("./platformBot");
+
+// Jalanin bot-bot musik (Music 1, 2, 3, ...) di proses yang sama.
+// Aktif kalau MUSIC_BOT_1_TOKEN ada di .env, kalau gak ada otomatis dilewati.
+require("./musicBots");

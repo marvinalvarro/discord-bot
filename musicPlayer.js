@@ -64,13 +64,18 @@ class GuildMusicQueue {
             await this.playNext();
         } else {
             this.playing = false;
-            // Auto-leave voice channel kalau 60 detik gak ada lagu, biar gak nyangkut
-            this.idleTimeout = setTimeout(() => {
-                if (!this.playing && this.songs.length === 0) {
-                    this.destroy();
-                }
-            }, 60 * 1000);
+            this.scheduleIdleLeave();
         }
+    }
+
+    // Auto-leave voice channel kalau 60 detik gak ada lagu, biar gak nyangkut
+    scheduleIdleLeave() {
+        clearTimeout(this.idleTimeout);
+        this.idleTimeout = setTimeout(() => {
+            if (!this.playing && this.songs.length === 0) {
+                this.destroy();
+            }
+        }, 60 * 1000);
     }
 
     async playNext() {
@@ -78,20 +83,42 @@ class GuildMusicQueue {
         const song = this.songs[0];
         if (!song) return;
 
-        try {
-            const resource = createAudioResource(song.source, { inlineVolume: true });
-            resource.volume.setVolume(this.volume);
-            this.player.play(resource);
-            this.playing = true;
+        // Tandai "sedang muter" dari awal, supaya perintah play lain yang masuk saat stream
+        // masih diambil gak ikut memanggil playNext() lagi (bisa dobel).
+        this.playing = true;
 
-            this.textChannel.send(`🎵 Sekarang muter: **${song.title}**`).catch(() => {});
+        try {
+            let input = song.source;
+            const options = { inlineVolume: true };
+
+            // Lagu streaming (YouTube/SoundCloud): stream diambil saat mau diputar.
+            // inlineVolume dimatikan supaya audio diteruskan apa adanya (hemat CPU server).
+            if (typeof song.getStream === "function") {
+                const s = await song.getStream();
+                input = s.stream;
+                if (s.type) options.inputType = s.type;
+                options.inlineVolume = false;
+            }
+
+            const resource = createAudioResource(input, options);
+            if (resource.volume) resource.volume.setVolume(this.volume);
+            this.player.play(resource);
+
+            const dur = song.duration ? ` \`${song.duration}\`` : "";
+            this.textChannel.send(`🎵 Sekarang muter: **${song.title}**${dur}`).catch(() => {});
         } catch (err) {
             console.error("[musicPlayer] Gagal play lagu:", err.message);
+            const hint = typeof song.getStream === "function" ? " (YouTube sering nolak koneksi dari server hosting)" : "";
             this.textChannel
-                .send(`⚠️ Gagal muter **${song.title}**, skip ke lagu berikutnya.`)
+                .send(`⚠️ Gagal muter **${song.title}**${hint}, skip ke lagu berikutnya.`)
                 .catch(() => {});
             this.songs.shift();
-            await this.playNext();
+            if (this.songs.length > 0) {
+                await this.playNext();
+            } else {
+                this.playing = false;
+                this.scheduleIdleLeave();
+            }
         }
     }
 
