@@ -6,8 +6,28 @@
 // koneksi dari server hosting (error 429 / "sign in to confirm you're not a bot").
 // Kalau sering gagal, lihat opsi YOUTUBE_COOKIE di bawah, atau pakai link SoundCloud.
 const play = require("play-dl");
+const youtubedl = require("youtube-dl-exec");
+const { StreamType } = require("@discordjs/voice");
 
 const MAX_PLAYLIST_SONGS = 20;
+function isYouTubeUrl(url) {
+    return /(?:youtube\.com|youtu\.be)/i.test(String(url || ""));
+}
+
+function getYouTubeStream(url) {
+    const proc = youtubedl.exec(url, {
+        format: "bestaudio/best",
+        output: "-",
+        quiet: true,
+        noWarnings: true,
+        noPlaylist: true,
+    });
+
+    return {
+        stream: proc.stdout,
+        type: StreamType.Arbitrary,
+    };
+}
 
 // Opsional: cookie YouTube (dari akun cadangan, JANGAN akun utama) kadang membantu kalau YouTube menolak.
 // Isi di .env: YOUTUBE_COOKIE=...  (risiko: akun itu bisa kena batasan dari YouTube)
@@ -31,6 +51,7 @@ function ensureSoundCloud() {
 }
 
 // Bikin objek lagu. Stream baru diambil saat lagu mau diputar (getStream), bukan saat ditambah ke antrian.
+
 function makeSong({ title, url, duration }, requestedBy) {
     return {
         title: title || url,
@@ -38,12 +59,22 @@ function makeSong({ title, url, duration }, requestedBy) {
         duration: duration || null,
         source: url,
         requestedBy,
+
         getStream: async () => {
+            if (isYouTubeUrl(url)) {
+                return getYouTubeStream(url);
+            }
+
             const s = await play.stream(url);
-            return { stream: s.stream, type: s.type };
+
+            return {
+                stream: s.stream,
+                type: s.type,
+            };
         },
     };
 }
+
 
 // ---------- SPOTIFY ----------
 // Spotify TIDAK dipakai buat audio. Seperti Jockie Music: ambil judul + artis dari Spotify,
@@ -120,15 +151,41 @@ async function spotifyOEmbedTitle(url) {
 // kecuali memang diminta di judul yang diketik.
 const BAD_WORDS = ["cover", "live", "remix", "karaoke", "slowed", "sped up", "reverb", "nightcore", "8d", "instrumental", "akustik", "acoustic", "reaction"];
 
+
 async function findBestYouTube(query, rawQuery = query) {
-    const results = await play.search(query, { limit: 5, source: { youtube: "video" } });
-    if (!results || results.length === 0) return null;
+    const data = await youtubedl(`ytsearch5:${query}`, {
+        dumpSingleJson: true,
+        flatPlaylist: true,
+        skipDownload: true,
+        quiet: true,
+        noWarnings: true,
+        noPlaylist: true,
+    });
+
+    const results = data.entries || [];
+    if (results.length === 0) return null;
+
+    const normalizedResults = results.map((v) => ({
+        title: v.title || "",
+        url: v.webpage_url ||
+            (v.id ? `https://www.youtube.com/watch?v=${v.id}` : ""),
+        durationRaw: v.duration_string ||
+            (v.duration
+                ? `${Math.floor(v.duration / 60)}:${String(
+                    Math.floor(v.duration % 60
+                )).padStart(2, "0")}`
+                : null),
+        durationInSec: v.duration || 0,
+        channel: {
+            name: v.channel || v.uploader || "",
+        },
+    })).filter((v) => v.url);
 
     const wanted = String(rawQuery).toLowerCase();
     let best = null;
     let bestScore = -Infinity;
 
-    results.forEach((v, i) => {
+    normalizedResults.forEach((v, i) => {
         const title = String(v.title || "").toLowerCase();
         const channel = String((v.channel && v.channel.name) || "").toLowerCase();
         let score = -i * 0.5; // urutan asli dari YouTube tetap dihargai
@@ -205,7 +262,7 @@ function makeLazySearchSong({ title, artist, url, duration }, requestedBy) {
                 if (!best) throw new Error(`Gak nemu "${q}" di YouTube.`);
                 cachedUrl = best.url;
             }
-            const s = await play.stream(cachedUrl);
+            return getYouTubeStream(cachedUrl);
             return { stream: s.stream, type: s.type };
         },
     };
