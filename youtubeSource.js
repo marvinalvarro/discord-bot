@@ -2,32 +2,13 @@
 // Ubah input user (link YouTube / playlist / link SoundCloud / judul lagu) jadi daftar "song"
 // yang bisa dimainkan musicPlayer.js. Pakai library play-dl yang sudah terpasang di project.
 //
-// CATATAN: play-dl sudah tidak dirawat lagi oleh pembuatnya, dan YouTube sering menolak
-// koneksi dari server hosting (error 429 / "sign in to confirm you're not a bot").
-// Kalau sering gagal, lihat opsi YOUTUBE_COOKIE di bawah, atau pakai link SoundCloud.
+// Jalur UTAMA sekarang yt-dlp (lihat ytdlp.js). play-dl hanya cadangan kalau yt-dlp gagal,
+// karena play-dl sudah tidak dirawat dan sering kena error 429 dari YouTube di server hosting.
+// Kalau YouTube tetap menolak sama sekali, lagu otomatis dicoba dicari di SoundCloud.
 const play = require("play-dl");
-const youtubedl = require("youtube-dl-exec");
-const { StreamType } = require("@discordjs/voice");
+const ytdlp = require("./ytdlp");
 
-const MAX_PLAYLIST_SONGS = 20;
-function isYouTubeUrl(url) {
-    return /(?:youtube\.com|youtu\.be)/i.test(String(url || ""));
-}
-
-function getYouTubeStream(url) {
-    const proc = youtubedl.exec(url, {
-        format: "bestaudio/best",
-        output: "-",
-        quiet: true,
-        noWarnings: true,
-        noPlaylist: true,
-    });
-
-    return {
-        stream: proc.stdout,
-        type: StreamType.Arbitrary,
-    };
-}
+const MAX_PLAYLIST_SONGS = 100;
 
 // Opsional: cookie YouTube (dari akun cadangan, JANGAN akun utama) kadang membantu kalau YouTube menolak.
 // Isi di .env: YOUTUBE_COOKIE=...  (risiko: akun itu bisa kena batasan dari YouTube)
@@ -50,31 +31,77 @@ function ensureSoundCloud() {
     return soundcloudReady;
 }
 
-// Bikin objek lagu. Stream baru diambil saat lagu mau diputar (getStream), bukan saat ditambah ke antrian.
+// ---------- LAPISAN AKSES (yt-dlp dulu, play-dl cadangan) ----------
+const fmtDuration = (sec) => (sec ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}` : null);
 
-function makeSong({ title, url, duration }, requestedBy) {
+// Hasil seragam: [{ title, url, durationSec, channel }]
+async function searchYouTube(query, limit = 5) {
+    try {
+        const r = await ytdlp.search(query, limit);
+        if (r.length > 0) return r;
+    } catch (err) {
+        console.log("[youtubeSource] yt-dlp search gagal, coba play-dl:", err.message);
+    }
+    const r = await play.search(query, { limit, source: { youtube: "video" } });
+    return (r || []).map((v) => ({
+        title: v.title || "",
+        url: v.url,
+        durationSec: v.durationInSec || null,
+        channel: (v.channel && v.channel.name) || "",
+    }));
+}
+
+// Stream audio: yt-dlp dulu, play-dl kalau gagal. Hasil: { stream, type, cleanup? }
+async function openStream(url) {
+    let ytErr;
+    try {
+        return await ytdlp.stream(url);
+    } catch (err) {
+        ytErr = err;
+        console.log("[youtubeSource] yt-dlp stream gagal, coba play-dl:", err.message);
+    }
+    try {
+        const s = await play.stream(url);
+        return { stream: s.stream, type: s.type };
+    } catch (err) {
+        // Laporkan alasan dari yt-dlp (lebih informatif daripada "429" dari play-dl)
+        throw new Error(ytErr ? ytErr.message : err.message);
+    }
+}
+
+// Cadangan terakhir: cari judul yang sama di SoundCloud
+async function soundcloudFallback(query) {
+    await ensureSoundCloud();
+    const r = await play.search(query, { limit: 1, source: { soundcloud: "tracks" } });
+    if (!r || r.length === 0) throw new Error(`Gak nemu "${query}" di SoundCloud juga.`);
+    const s = await play.stream(r[0].url);
+    return { stream: s.stream, type: s.type };
+}
+
+// Bikin objek lagu. Stream baru diambil saat lagu mau diputar (getStream), bukan saat ditambah ke antrian.
+// fallbackQuery (opsional): kalau stream YouTube gagal, judul ini dicari di SoundCloud.
+function makeSong({ title, url, duration, fallbackQuery }, requestedBy) {
     return {
         title: title || url,
         url,
         duration: duration || null,
         source: url,
         requestedBy,
-
         getStream: async () => {
-            if (isYouTubeUrl(url)) {
-                return getYouTubeStream(url);
+            try {
+                return await openStream(url);
+            } catch (err) {
+                if (!fallbackQuery) throw err;
+                console.log(`[youtubeSource] YouTube gagal (${err.message}), coba SoundCloud buat "${fallbackQuery}"...`);
+                try {
+                    return await soundcloudFallback(fallbackQuery);
+                } catch (scErr) {
+                    throw err; // tampilkan alasan asli dari YouTube
+                }
             }
-
-            const s = await play.stream(url);
-
-            return {
-                stream: s.stream,
-                type: s.type,
-            };
         },
     };
 }
-
 
 // ---------- SPOTIFY ----------
 // Spotify TIDAK dipakai buat audio. Seperti Jockie Music: ambil judul + artis dari Spotify,
@@ -151,43 +178,17 @@ async function spotifyOEmbedTitle(url) {
 // kecuali memang diminta di judul yang diketik.
 const BAD_WORDS = ["cover", "live", "remix", "karaoke", "slowed", "sped up", "reverb", "nightcore", "8d", "instrumental", "akustik", "acoustic", "reaction"];
 
-
 async function findBestYouTube(query, rawQuery = query) {
-    const data = await youtubedl(`ytsearch5:${query}`, {
-        dumpSingleJson: true,
-        flatPlaylist: true,
-        skipDownload: true,
-        quiet: true,
-        noWarnings: true,
-        noPlaylist: true,
-    });
-
-    const results = data.entries || [];
-    if (results.length === 0) return null;
-
-    const normalizedResults = results.map((v) => ({
-        title: v.title || "",
-        url: v.webpage_url ||
-            (v.id ? `https://www.youtube.com/watch?v=${v.id}` : ""),
-        durationRaw: v.duration_string ||
-            (v.duration
-                ? `${Math.floor(v.duration / 60)}:${String(
-                    Math.floor(v.duration % 60
-                )).padStart(2, "0")}`
-                : null),
-        durationInSec: v.duration || 0,
-        channel: {
-            name: v.channel || v.uploader || "",
-        },
-    })).filter((v) => v.url);
+    const results = await searchYouTube(query, 5);
+    if (!results || results.length === 0) return null;
 
     const wanted = String(rawQuery).toLowerCase();
     let best = null;
     let bestScore = -Infinity;
 
-    normalizedResults.forEach((v, i) => {
+    results.forEach((v, i) => {
         const title = String(v.title || "").toLowerCase();
-        const channel = String((v.channel && v.channel.name) || "").toLowerCase();
+        const channel = String(v.channel || "").toLowerCase();
         let score = -i * 0.5; // urutan asli dari YouTube tetap dihargai
 
         if (/ - topic$/.test(channel)) score += 3;
@@ -195,7 +196,7 @@ async function findBestYouTube(query, rawQuery = query) {
         for (const bad of BAD_WORDS) {
             if (new RegExp(`\\b${bad}\\b`, "i").test(title) && !wanted.includes(bad)) score -= 3;
         }
-        if (v.durationInSec && v.durationInSec > 15 * 60) score -= 3; // kemungkinan kompilasi/mix panjang
+        if (v.durationSec && v.durationSec > 15 * 60) score -= 3; // kemungkinan kompilasi/mix panjang
 
         if (score > bestScore) {
             best = v;
@@ -257,13 +258,21 @@ function makeLazySearchSong({ title, artist, url, duration }, requestedBy) {
         source: url,
         requestedBy,
         getStream: async () => {
-            if (!cachedUrl) {
-                const best = await findBestYouTube(q);
-                if (!best) throw new Error(`Gak nemu "${q}" di YouTube.`);
-                cachedUrl = best.url;
+            try {
+                if (!cachedUrl) {
+                    const best = await findBestYouTube(q);
+                    if (!best) throw new Error(`Gak nemu "${q}" di YouTube.`);
+                    cachedUrl = best.url;
+                }
+                return await openStream(cachedUrl);
+            } catch (err) {
+                console.log(`[youtubeSource] YouTube gagal buat "${q}" (${err.message}), coba SoundCloud...`);
+                try {
+                    return await soundcloudFallback(q);
+                } catch (scErr) {
+                    throw err; // tampilkan alasan asli dari YouTube
+                }
             }
-            return getYouTubeStream(cachedUrl);
-            return { stream: s.stream, type: s.type };
         },
     };
 }
@@ -312,24 +321,50 @@ async function resolveQuery(query, requestedBy) {
         const yt = play.yt_validate(text);
 
         if (yt === "video") {
-            const info = await play.video_basic_info(text);
-            const d = info.video_details;
-            return { songs: [makeSong({ title: d.title, url: d.url || text, duration: d.durationRaw }, requestedBy)] };
+            let title = null;
+            let duration = null;
+            try {
+                const i = await ytdlp.info(text);
+                if (i) {
+                    title = i.title;
+                    duration = fmtDuration(i.durationSec);
+                }
+            } catch (err) {
+                try {
+                    const d = (await play.video_basic_info(text)).video_details;
+                    title = d.title;
+                    duration = d.durationRaw;
+                } catch (err2) {
+                    // info gagal diambil: tetap coba putar langsung, judul pakai link
+                }
+            }
+            return { songs: [makeSong({ title, url: text, duration }, requestedBy)] };
         }
 
         if (yt === "playlist") {
-            const pl = await play.playlist_info(text, { incomplete: true });
+            let plTitle = "";
             let vids = [];
             try {
-                vids = typeof pl.page === "function" ? await pl.page(1) : pl.videos;
+                const pl = await ytdlp.playlist(text, MAX_PLAYLIST_SONGS);
+                plTitle = pl.title;
+                vids = pl.entries.map((v) => ({ title: v.title, url: v.url, duration: fmtDuration(v.durationSec) }));
             } catch (err) {
-                vids = pl.videos || [];
+                console.log("[youtubeSource] yt-dlp playlist gagal, coba play-dl:", err.message);
+                const pl = await play.playlist_info(text, { incomplete: true });
+                plTitle = pl.title;
+                let raw = [];
+                try {
+                    raw = typeof pl.page === "function" ? await pl.page(1) : pl.videos;
+                } catch (e) {
+                    raw = pl.videos || [];
+                }
+                vids = (raw || []).map((v) => ({ title: v.title, url: v.url, duration: v.durationRaw }));
             }
-            vids = (vids || []).slice(0, MAX_PLAYLIST_SONGS);
+            vids = vids.slice(0, MAX_PLAYLIST_SONGS);
             if (vids.length === 0) throw new Error("Playlist kosong atau gak bisa dibaca.");
             return {
-                songs: vids.map((v) => makeSong({ title: v.title, url: v.url, duration: v.durationRaw }, requestedBy)),
-                note: `Playlist **${pl.title || "tanpa judul"}** (maks ${MAX_PLAYLIST_SONGS} lagu pertama)`,
+                songs: vids.map((v) => makeSong(v, requestedBy)),
+                note: `Playlist **${plTitle || "tanpa judul"}** (maks ${MAX_PLAYLIST_SONGS} lagu pertama)`,
             };
         }
 
@@ -362,10 +397,17 @@ async function resolveQuery(query, requestedBy) {
     }
 
     const q = canonical && canonical.title ? (canonical.artist ? `${canonical.artist} - ${canonical.title}` : canonical.title) : text;
-    const best = await findBestYouTube(q, text);
+    let best;
+    try {
+        best = await findBestYouTube(q, text);
+    } catch (err) {
+        // Pencarian YouTube diblokir: serahkan ke pencarian "malas" (YouTube lagi, lalu SoundCloud) saat lagu diputar
+        console.log("[youtubeSource] Pencarian YouTube gagal:", err.message);
+        return { songs: [makeLazySearchSong({ title: q, artist: "", url: null }, requestedBy)] };
+    }
     if (!best) throw new Error(`Gak nemu hasil buat "${text}".`);
     return {
-        songs: [makeSong({ title: canonical ? q : best.title, url: best.url, duration: best.durationRaw }, requestedBy)],
+        songs: [makeSong({ title: canonical ? q : best.title, url: best.url, duration: fmtDuration(best.durationSec), fallbackQuery: q }, requestedBy)],
     };
 }
 

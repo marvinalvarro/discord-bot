@@ -43,6 +43,7 @@ class GuildMusicQueue {
         this.loopMode = "off"; // off | track | queue
         this.playing = false;
         this.idleTimeout = null;
+        this.cleanupStream = null; // mematikan proses yt-dlp lagu yang sedang jalan
 
         this.player.on(AudioPlayerStatus.Idle, () => this.handleTrackEnd());
         this.player.on("error", (err) => {
@@ -51,7 +52,21 @@ class GuildMusicQueue {
         });
     }
 
+    // Matikan proses pengambil audio (yt-dlp) lagu sebelumnya supaya gak numpuk di server
+    releaseStream() {
+        const fn = this.cleanupStream;
+        this.cleanupStream = null;
+        if (typeof fn === "function") {
+            try {
+                fn();
+            } catch (err) {
+                // proses sudah mati
+            }
+        }
+    }
+
     async handleTrackEnd() {
+        this.releaseStream();
         const finished = this.songs.shift();
 
         if (this.loopMode === "track" && finished) {
@@ -86,6 +101,7 @@ class GuildMusicQueue {
         // Tandai "sedang muter" dari awal, supaya perintah play lain yang masuk saat stream
         // masih diambil gak ikut memanggil playNext() lagi (bisa dobel).
         this.playing = true;
+        this.releaseStream();
 
         try {
             let input = song.source;
@@ -96,6 +112,7 @@ class GuildMusicQueue {
             if (typeof song.getStream === "function") {
                 const s = await song.getStream();
                 input = s.stream;
+                this.cleanupStream = s.cleanup || null;
                 if (s.type) options.inputType = s.type;
                 options.inlineVolume = false;
             }
@@ -107,8 +124,9 @@ class GuildMusicQueue {
             const dur = song.duration ? ` \`${song.duration}\`` : "";
             this.textChannel.send(`🎵 Sekarang muter: **${song.title}**${dur}`).catch(() => {});
         } catch (err) {
+            this.releaseStream();
             console.error("[musicPlayer] Gagal play lagu:", err.message);
-            const hint = typeof song.getStream === "function" ? " (YouTube sering nolak koneksi dari server hosting)" : "";
+            const hint = typeof song.getStream === "function" ? ` (${String(err.message).slice(0, 120)})` : "";
             this.textChannel
                 .send(`⚠️ Gagal muter **${song.title}**${hint}, skip ke lagu berikutnya.`)
                 .catch(() => {});
@@ -124,6 +142,7 @@ class GuildMusicQueue {
 
     destroy() {
         clearTimeout(this.idleTimeout);
+        this.releaseStream();
         if (this.connection) {
             try {
                 this.connection.destroy();
