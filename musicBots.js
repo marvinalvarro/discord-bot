@@ -169,6 +169,7 @@ function getControl(message) {
 
 function friendlyError(err) {
     const m = String(err && err.message ? err.message : err);
+    if (/^YouTube lagi nge-blok/.test(m)) return m; // pesan jeda dari youtubeSource.js sudah jelas
     if (/429|too many requests|sign in|not a bot|confirm you/i.test(m)) {
         return "YouTube nolak permintaan dari server (ini sering terjadi di server hosting). Coba lagi nanti, atau pakai link SoundCloud.";
     }

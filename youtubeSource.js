@@ -7,6 +7,36 @@
 // Kalau sering gagal, lihat opsi YOUTUBE_COOKIE di bawah, atau pakai link SoundCloud.
 const play = require("play-dl");
 
+// ---------- PELINDUNG ERROR 429 ----------
+// Kalau YouTube membalas 429 (kebanyakan permintaan dari IP server) atau minta "sign in / not a bot",
+// semua permintaan ke YouTube dihentikan sementara. Terus memaksa cuma bikin blokirnya makin lama.
+const YOUTUBE_COOLDOWN_MS = Math.max(0, Number(process.env.YOUTUBE_COOLDOWN_MIN || 10)) * 60 * 1000;
+let youtubeBlockedUntil = 0;
+
+function isRateLimitError(err) {
+    return /429|too many requests|sign in to confirm|not a bot/i.test(String((err && err.message) || err));
+}
+
+async function yt(call) {
+    if (Date.now() < youtubeBlockedUntil) {
+        const minutes = Math.max(1, Math.ceil((youtubeBlockedUntil - Date.now()) / 60000));
+        throw new Error(
+            `YouTube lagi nge-blok server bot (error 429). Biar gak makin lama, bot istirahat dulu sekitar ${minutes} menit. Coba lagi nanti, atau pakai link SoundCloud.`
+        );
+    }
+    try {
+        return await call();
+    } catch (err) {
+        if (isRateLimitError(err)) {
+            if (Date.now() >= youtubeBlockedUntil) {
+                console.log(`[youtubeSource] YouTube menolak (429/anti-bot). Semua permintaan ke YouTube dijeda ${Math.round(YOUTUBE_COOLDOWN_MS / 60000)} menit.`);
+            }
+            youtubeBlockedUntil = Date.now() + YOUTUBE_COOLDOWN_MS;
+        }
+        throw err;
+    }
+}
+
 const MAX_PLAYLIST_SONGS = 20;
 
 // Opsional: cookie YouTube (dari akun cadangan, JANGAN akun utama) kadang membantu kalau YouTube menolak.
@@ -40,7 +70,7 @@ function makeSong({ title, url, duration }, requestedBy) {
         source: url,
         requestedBy,
         getStream: async () => {
-            const s = await play.stream(url);
+            const s = /youtu\.?be/i.test(url) ? await yt(() => play.stream(url)) : await play.stream(url);
             return { stream: s.stream, type: s.type };
         },
     };
@@ -122,7 +152,7 @@ async function spotifyOEmbedTitle(url) {
 const BAD_WORDS = ["cover", "live", "remix", "karaoke", "slowed", "sped up", "reverb", "nightcore", "8d", "instrumental", "akustik", "acoustic", "reaction"];
 
 async function findBestYouTube(query, rawQuery = query) {
-    const results = await play.search(query, { limit: 5, source: { youtube: "video" } });
+    const results = await yt(() => play.search(query, { limit: 5, source: { youtube: "video" } }));
     if (!results || results.length === 0) return null;
 
     const wanted = String(rawQuery).toLowerCase();
@@ -209,7 +239,7 @@ function makeLazySearchSong({ title, artist, url, duration }, requestedBy) {
                 cachedUrl = best.url;
             }
             song.resolvedUrl = cachedUrl;
-            const s = await play.stream(cachedUrl);
+            const s = await yt(() => play.stream(cachedUrl));
             return { stream: s.stream, type: s.type };
         },
     };
@@ -260,13 +290,13 @@ async function resolveQuery(query, requestedBy) {
         const yt = play.yt_validate(text);
 
         if (yt === "video") {
-            const info = await play.video_basic_info(text);
+            const info = await yt(() => play.video_basic_info(text));
             const d = info.video_details;
             return { songs: [makeSong({ title: d.title, url: d.url || text, duration: d.durationRaw }, requestedBy)] };
         }
 
         if (yt === "playlist") {
-            const pl = await play.playlist_info(text, { incomplete: true });
+            const pl = await yt(() => play.playlist_info(text, { incomplete: true }));
             let vids = [];
             try {
                 vids = typeof pl.page === "function" ? await pl.page(1) : pl.videos;
@@ -358,15 +388,15 @@ async function findRelatedSong(basis, history, requestedBy) {
     let channelName = "";
 
     try {
-        const info = await play.video_basic_info(baseUrl);
+        const info = await yt(() => play.video_basic_info(baseUrl));
         channelName = (info.video_details && info.video_details.channel && info.video_details.channel.name) || "";
         let checked = 0;
         for (const u of info.related_videos || []) {
-            if (checked >= 6) break;
+            if (checked >= 4) break; // sedikit-sedikit saja, biar gak memicu 429
             if (seen.has(videoIdOf(u))) continue;
             checked++;
             try {
-                const d = (await play.video_basic_info(u)).video_details;
+                const d = (await yt(() => play.video_basic_info(u))).video_details;
                 if (okCandidate(d, seen, basis.title)) {
                     return makeSong({ title: d.title, url: d.url || u, duration: d.durationRaw }, requestedBy);
                 }
@@ -380,7 +410,7 @@ async function findRelatedSong(basis, history, requestedBy) {
 
     const artist = basis.artist || channelName.replace(/ - topic$/i, "").trim();
     if (artist) {
-        const results = await play.search(artist, { limit: 10, source: { youtube: "video" } });
+        const results = await yt(() => play.search(artist, { limit: 10, source: { youtube: "video" } }));
         for (const v of results || []) {
             if (okCandidate(v, seen, basis.title)) {
                 return makeSong({ title: v.title, url: v.url, duration: v.durationRaw }, requestedBy);
