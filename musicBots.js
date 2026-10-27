@@ -15,7 +15,7 @@ require("dotenv").config();
 const { Client, GatewayIntentBits, ActivityType, Events } = require("discord.js");
 const { joinVoiceChannel, entersState, VoiceConnectionStatus } = require("@discordjs/voice");
 const { getQueue, connectToVoice } = require("./musicPlayer");
-const { resolveQuery } = require("./youtubeSource");
+const { resolveQuery, findRelatedSong } = require("./youtubeSource");
 
 const PREFIX = process.env.MUSIC_PREFIX || "2";
 const LOBBY_ID = (process.env.MUSIC_LOBBY_VOICE_ID || "").trim();
@@ -26,7 +26,7 @@ const NO_QUEUE_GRACE_MS = 30 * 1000;      // queue hilang (mis. auto-leave) -> b
 const IDLE_NO_SONG_MS = 3 * 60 * 1000;    // sudah ;join tapi gak ada lagu selama ini -> dilepas
 const EMPTY_CHANNEL_MS = 60 * 1000;       // voice channel gak ada manusia selama ini -> dilepas
 
-const ALIASES = { p: "play", s: "skip", q: "queue", vol: "volume", leave: "stop", dc: "stop", disconnect: "stop" };
+const ALIASES = { p: "play", s: "skip", q: "queue", vol: "volume", leave: "stop", dc: "stop", disconnect: "stop", ap: "autoplay" };
 
 // { index, name, client, ready, session }
 // session = { guildId, voiceChannelId, ownerId, startedAt, lastActivity, busy, emptySince }
@@ -307,7 +307,7 @@ const COMMANDS = {
 
         const lines = c.queue.songs.slice(0, 10).map((s, i) => `${i === 0 ? "▶️" : `${i}.`} **${s.title}**${s.duration ? ` \`${s.duration}\`` : ""}`);
         if (c.queue.songs.length > 10) lines.push(`...dan ${c.queue.songs.length - 10} lagu lagi`);
-        await say(c.bot, message, `🎶 **Antrian ${c.bot.name}** (loop: ${c.queue.loopMode})\n${lines.join("\n")}`);
+        await say(c.bot, message, `🎶 **Antrian ${c.bot.name}** (loop: ${c.queue.loopMode}, autoplay: ${c.queue.autoplay ? "nyala ♾️" : "mati"})\n${lines.join("\n")}`);
     },
 
     async volume(message, args) {
@@ -342,7 +342,38 @@ const COMMANDS = {
             return say(c.bot, message, `Pakai: \`${PREFIX}loop off\`, \`${PREFIX}loop track\`, atau \`${PREFIX}loop queue\`.`);
         }
         c.queue.loopMode = mode;
-        await say(c.bot, message, `🔁 Loop diatur ke **${mode}**.`);
+        let note = "";
+        if (mode !== "off" && c.queue.autoplay) {
+            c.queue.autoplay = false;
+            note = " Autoplay dimatikan karena loop aktif.";
+        }
+        await say(c.bot, message, `🔁 Loop diatur ke **${mode}**.${note}`);
+    },
+
+    async autoplay(message, args) {
+        const c = getControl(message);
+        if (!c) return;
+        if (!c.queue || (!c.queue.playing && c.queue.songs.length === 0)) {
+            return say(c.bot, message, `Muter 1 lagu dulu pakai \`${PREFIX}play\`, baru nyalain autoplay.`);
+        }
+
+        const arg = (args[0] || "").toLowerCase();
+        const turnOn = arg === "on" ? true : arg === "off" ? false : !c.queue.autoplay; // tanpa argumen = toggle
+
+        if (!turnOn) {
+            c.queue.autoplay = false;
+            return say(c.bot, message, "♾️ Autoplay dimatikan. Antrian yang ada tetap diputar sampai habis.");
+        }
+
+        c.queue.autoplay = true;
+        c.queue.loopMode = "off"; // autoplay gak cocok barengan loop
+        c.queue.autoplayFetcher = (basis, history) => findRelatedSong(basis, history, "Autoplay");
+        c.queue.refillAutoplay(); // siapkan lagu berikutnya di belakang layar
+        await say(
+            c.bot,
+            message,
+            `♾️ Autoplay nyala! Kalau antrian habis, bot otomatis nyari lagu mirip dan lanjut terus. Berhenti dengan \`${PREFIX}stop\` atau \`${PREFIX}leave\`, atau matiin lewat \`${PREFIX}autoplay\`.`
+        );
     },
 
     async bots(message) {
@@ -358,8 +389,8 @@ const COMMANDS = {
         await reply(
             message,
             `🎧 **Bot musik** (prefix \`${PREFIX}\`)\n` +
-                `\`join\` ambil bot, \`play <link/judul>\`, \`skip\`, \`stop\`, \`pause\`, \`resume\`, \`queue\`, \`loop <off|track|queue>\`, \`bots\`\n` +
-                `Link yang didukung: YouTube (video/playlist), Spotify (lagu/album/playlist, dicari otomatis di YouTube), dan SoundCloud (track).`
+                `\`join\` ambil bot, \`play <link/judul>\`, \`autoplay\`, \`skip\`, \`stop\`, \`pause\`, \`resume\`, \`queue\`, \`loop <off|track|queue>\`, \`bots\`\n` +
+                `Link yang didukung: YouTube (video/playlist), Spotify (lagu/album/playlist/artis, dicari otomatis di YouTube), dan SoundCloud (track).`
         );
     },
 };

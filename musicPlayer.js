@@ -43,7 +43,13 @@ class GuildMusicQueue {
         this.loopMode = "off"; // off | track | queue
         this.playing = false;
         this.idleTimeout = null;
-        this.cleanupStream = null; // mematikan proses yt-dlp lagu yang sedang jalan
+
+        // Autoplay: kalau antrian habis, cari lagu lanjutan otomatis lewat autoplayFetcher(basisSong, history)
+        this.autoplay = false;
+        this.autoplayFetcher = null;
+        this.autoplayPromise = null;
+        this.history = []; // URL lagu yang sudah diputar (dipakai autoplay supaya gak ngulang)
+        this.lastPlayed = null;
 
         this.player.on(AudioPlayerStatus.Idle, () => this.handleTrackEnd());
         this.player.on("error", (err) => {
@@ -52,27 +58,25 @@ class GuildMusicQueue {
         });
     }
 
-    // Matikan proses pengambil audio (yt-dlp) lagu sebelumnya supaya gak numpuk di server
-    releaseStream() {
-        const fn = this.cleanupStream;
-        this.cleanupStream = null;
-        if (typeof fn === "function") {
-            try {
-                fn();
-            } catch (err) {
-                // proses sudah mati
-            }
-        }
-    }
-
     async handleTrackEnd() {
-        this.releaseStream();
         const finished = this.songs.shift();
+        if (finished) this.lastPlayed = finished;
 
         if (this.loopMode === "track" && finished) {
             this.songs.unshift(finished);
         } else if (this.loopMode === "queue" && finished) {
             this.songs.push(finished);
+        }
+
+        // Antrian habis tapi autoplay nyala -> cari lagu lanjutan (kalau sudah ke-prefetch, langsung dipakai)
+        if (this.songs.length === 0 && this.autoplay) {
+            await this.refillAutoplay(finished);
+            if (this.songs.length === 0 && this.autoplay) {
+                this.autoplay = false;
+                this.textChannel
+                    .send("♾️ Autoplay gak nemu lagu lanjutan (YouTube lagi nolak atau gak ada rekomendasi), autoplay dimatikan.")
+                    .catch(() => {});
+            }
         }
 
         if (this.songs.length > 0) {
@@ -81,6 +85,46 @@ class GuildMusicQueue {
             this.playing = false;
             this.scheduleIdleLeave();
         }
+    }
+
+    // Catat lagu yang mulai diputar (buat riwayat autoplay) dan siapkan lagu berikutnya di belakang layar
+    trackPlayed(song) {
+        this.lastPlayed = song;
+        const key = song.resolvedUrl || song.url;
+        if (key) {
+            this.history.push(key);
+            if (this.history.length > 50) this.history.shift();
+        }
+        if (this.autoplay && this.songs.length <= 1) this.refillAutoplay();
+    }
+
+    // Cari 1 lagu lanjutan dan taruh di akhir antrian. Kalau sudah ada proses pencarian, ikut menunggu yang itu.
+    refillAutoplay(basisOverride) {
+        if (!this.autoplay || !this.autoplayFetcher) return Promise.resolve(false);
+        if (this.autoplayPromise) return this.autoplayPromise;
+
+        const basis = basisOverride || this.songs[this.songs.length - 1] || this.lastPlayed;
+        if (!basis) return Promise.resolve(false);
+
+        const p = (async () => {
+            try {
+                const next = await this.autoplayFetcher(basis, this.history);
+                if (next && this.autoplay) {
+                    next.autoplay = true;
+                    this.songs.push(next);
+                    return true;
+                }
+            } catch (err) {
+                console.error("[musicPlayer] Autoplay gagal cari lagu:", err.message);
+            }
+            return false;
+        })();
+
+        this.autoplayPromise = p;
+        p.finally(() => {
+            if (this.autoplayPromise === p) this.autoplayPromise = null;
+        });
+        return p;
     }
 
     // Auto-leave voice channel kalau 60 detik gak ada lagu, biar gak nyangkut
@@ -101,7 +145,6 @@ class GuildMusicQueue {
         // Tandai "sedang muter" dari awal, supaya perintah play lain yang masuk saat stream
         // masih diambil gak ikut memanggil playNext() lagi (bisa dobel).
         this.playing = true;
-        this.releaseStream();
 
         try {
             let input = song.source;
@@ -112,7 +155,6 @@ class GuildMusicQueue {
             if (typeof song.getStream === "function") {
                 const s = await song.getStream();
                 input = s.stream;
-                this.cleanupStream = s.cleanup || null;
                 if (s.type) options.inputType = s.type;
                 options.inlineVolume = false;
             }
@@ -120,13 +162,13 @@ class GuildMusicQueue {
             const resource = createAudioResource(input, options);
             if (resource.volume) resource.volume.setVolume(this.volume);
             this.player.play(resource);
+            this.trackPlayed(song);
 
             const dur = song.duration ? ` \`${song.duration}\`` : "";
-            this.textChannel.send(`🎵 Sekarang muter: **${song.title}**${dur}`).catch(() => {});
+            this.textChannel.send(`🎵 Sekarang muter: **${song.title}**${dur}${song.autoplay ? " ♾️" : ""}`).catch(() => {});
         } catch (err) {
-            this.releaseStream();
             console.error("[musicPlayer] Gagal play lagu:", err.message);
-            const hint = typeof song.getStream === "function" ? ` (${String(err.message).slice(0, 120)})` : "";
+            const hint = typeof song.getStream === "function" ? " (YouTube sering nolak koneksi dari server hosting)" : "";
             this.textChannel
                 .send(`⚠️ Gagal muter **${song.title}**${hint}, skip ke lagu berikutnya.`)
                 .catch(() => {});
@@ -142,7 +184,6 @@ class GuildMusicQueue {
 
     destroy() {
         clearTimeout(this.idleTimeout);
-        this.releaseStream();
         if (this.connection) {
             try {
                 this.connection.destroy();
