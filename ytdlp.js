@@ -11,7 +11,7 @@
 //   YTDLP_COOKIES=cookies.txt   file cookies format Netscape (pakai akun cadangan, bukan akun utama)
 //   YTDLP_EXTRA_ARGS=--js-runtimes node   argumen tambahan, dipisah spasi
 //   YTDLP_NO_UPDATE=1       matikan auto-update
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { PassThrough } = require("stream");
@@ -20,9 +20,64 @@ const IS_WIN = process.platform === "win32";
 // Binary standalone (gak butuh Python). Sengaja TIDAK memakai binary bawaan youtube-dl-exec,
 // karena yang itu bisa berupa skrip Python dan gagal jalan di server yang gak punya Python.
 const BIN_PATH = process.env.YTDLP_PATH || path.join(__dirname, "bin", IS_WIN ? "yt-dlp.exe" : "yt-dlp");
+// Versi Python (satu file ~3 MB, tanpa ekstraksi ke temp). Dipakai otomatis kalau server punya Python 3.10+;
+// ini jauh lebih ringan dan gak kena error "Failed to extract entry" milik binary standalone.
+const PY_FILE = path.join(__dirname, "bin", "yt-dlp.pyz");
 const UPDATE_AFTER_MS = 12 * 60 * 60 * 1000;
 const RETRY_AFTER_FAIL_MS = 10 * 60 * 1000;
 const FIRST_BYTE_TIMEOUT_MS = 45 * 1000;
+
+// yt-dlp standalone mengekstrak dirinya ke folder temp tiap kali jalan. /tmp di hosting sering kecil,
+// jadi dipindah ke folder project (./tmp) dan sisa ekstrak yang yatim dibersihkan saat startup.
+const TMP_DIR = path.join(__dirname, "tmp");
+try {
+    fs.mkdirSync(TMP_DIR, { recursive: true });
+    for (const name of fs.readdirSync(TMP_DIR)) {
+        if (name.startsWith("_MEI")) fs.rmSync(path.join(TMP_DIR, name), { recursive: true, force: true });
+    }
+} catch (err) {
+    // gak fatal
+}
+
+function childEnv() {
+    return { ...process.env, TMPDIR: TMP_DIR, TEMP: TMP_DIR, TMP: TMP_DIR };
+}
+
+// Proses yt-dlp dijalankan sebagai grup sendiri, dan dimatikan lembut (SIGTERM) supaya pembungkusnya sempat
+// membersihkan folder temp dan ikut mematikan proses dalamnya. SIGKILL hanya jadi cadangan.
+const active = new Set();
+function spawnYtdlp(target, args) {
+    const proc = spawn(target.cmd, [...target.pre, ...args], { stdio: ["ignore", "pipe", "pipe"], env: childEnv(), detached: !IS_WIN });
+    active.add(proc);
+    proc.once("close", () => active.delete(proc));
+    return proc;
+}
+
+function killProc(proc) {
+    if (!proc || proc.exitCode !== null || proc.signalCode !== null) return;
+    const send = (sig) => {
+        try {
+            if (IS_WIN) proc.kill(sig);
+            else process.kill(-proc.pid, sig);
+        } catch (err) {
+            // sudah mati
+        }
+    };
+    send("SIGTERM");
+    const t = setTimeout(() => send("SIGKILL"), 4000);
+    if (t.unref) t.unref();
+}
+
+process.once("exit", () => {
+    for (const proc of active) {
+        try {
+            if (IS_WIN) proc.kill("SIGKILL");
+            else process.kill(-proc.pid, "SIGKILL");
+        } catch (err) {
+            // sudah mati
+        }
+    }
+});
 
 let ffmpegPath = null;
 try {
@@ -40,35 +95,38 @@ function assetName() {
     return process.arch === "arm64" ? "yt-dlp_linux_aarch64" : "yt-dlp_linux";
 }
 
-async function download() {
-    fs.mkdirSync(path.dirname(BIN_PATH), { recursive: true });
-    console.log("[ytdlp] Mengunduh yt-dlp (sekali saja, +/- 35 MB)...");
-    const res = await fetch(`https://github.com/yt-dlp/yt-dlp/releases/latest/download/${assetName()}`, {
+async function download(target) {
+    fs.mkdirSync(path.dirname(target.file), { recursive: true });
+    const asset = target.kind === "python" ? "yt-dlp" : assetName();
+    console.log(`[ytdlp] Mengunduh yt-dlp (${target.kind === "python" ? "versi Python, +/- 3 MB" : "standalone, +/- 35 MB"}, sekali saja)...`);
+    const res = await fetch(`https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`, {
         redirect: "follow",
         signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) throw new Error(`unduh yt-dlp gagal (status ${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());
-    const tmp = BIN_PATH + ".tmp";
+    const tmp = target.file + ".tmp";
     fs.writeFileSync(tmp, buf);
     if (!IS_WIN) fs.chmodSync(tmp, 0o755);
-    fs.renameSync(tmp, BIN_PATH);
+    fs.renameSync(tmp, target.file);
     console.log("[ytdlp] yt-dlp terpasang.");
 }
 
-function updateInBackground() {
-    if (process.env.YTDLP_NO_UPDATE === "1" || process.env.YTDLP_PATH) return;
+function updateInBackground(target) {
+    if (process.env.YTDLP_NO_UPDATE === "1" || target.kind === "custom") return;
     try {
-        if (Date.now() - fs.statSync(BIN_PATH).mtimeMs < UPDATE_AFTER_MS) return;
-        const p = spawn(BIN_PATH, ["-U"], { stdio: "ignore" });
-        const timer = setTimeout(() => p.kill("SIGKILL"), 90_000);
+        if (Date.now() - fs.statSync(target.file).mtimeMs < UPDATE_AFTER_MS) return;
+        const p = spawnYtdlp(target, ["-U"]);
+        p.stdout.resume();
+        p.stderr.resume();
+        const timer = setTimeout(() => killProc(p), 90_000);
         p.on("error", () => clearTimeout(timer));
         p.on("close", (code) => {
             clearTimeout(timer);
             if (code === 0) {
                 try {
                     const now = new Date();
-                    fs.utimesSync(BIN_PATH, now, now); // tandai sudah dicek, biar gak diulang tiap restart
+                    fs.utimesSync(target.file, now, now); // tandai sudah dicek, biar gak diulang tiap restart
                 } catch (err) {
                     // gak fatal
                 }
@@ -79,13 +137,39 @@ function updateInBackground() {
     }
 }
 
+// Cari Python 3.10+ (syarat yt-dlp versi Python). Hasil: nama perintah, atau null.
+function findPython() {
+    if (IS_WIN || process.env.YTDLP_NO_PYTHON === "1") return null;
+    for (const cmd of ["python3", "python"]) {
+        try {
+            const r = spawnSync(cmd, ["-c", "import sys;print(1 if sys.version_info>=(3,10) else 0)"], {
+                encoding: "utf8",
+                timeout: 10_000,
+            });
+            if (r.status === 0 && String(r.stdout).trim() === "1") return cmd;
+        } catch (err) {
+            // perintah gak ada, coba berikutnya
+        }
+    }
+    return null;
+}
+
+function pickTarget() {
+    if (process.env.YTDLP_PATH) return { kind: "custom", cmd: process.env.YTDLP_PATH, pre: [], file: process.env.YTDLP_PATH };
+    const py = findPython();
+    if (py) return { kind: "python", cmd: py, pre: [PY_FILE], file: PY_FILE };
+    return { kind: "standalone", cmd: BIN_PATH, pre: [], file: BIN_PATH };
+}
+
 let readyPromise = null;
 function ensureBinary() {
     if (!readyPromise) {
         readyPromise = (async () => {
-            if (!fs.existsSync(BIN_PATH)) await download();
-            else updateInBackground();
-            return BIN_PATH;
+            const target = pickTarget();
+            console.log(`[ytdlp] Mode: ${target.kind}`);
+            if (!fs.existsSync(target.file)) await download(target);
+            else updateInBackground(target);
+            return target;
         })().catch((err) => {
             failedAt = Date.now();
             readyPromise = null;
@@ -116,6 +200,9 @@ function toError(stderr, code) {
     const errLine =
         [...lines].reverse().find((l) => /^ERROR:/i.test(l)) || lines[lines.length - 1] || `yt-dlp keluar dengan kode ${code}`;
     const msg = errLine.replace(/^ERROR:\s*/i, "").slice(0, 300);
+    if (/Failed to extract entry|PYI-\d+/i.test(stderr)) {
+        console.log("[ytdlp] yt-dlp standalone gagal mengekstrak (temp/disk penuh). Pasang Python 3.10+ atau kosongkan disk; hapus folder bin/ lalu restart.");
+    }
     if (!hintShown && /javascript runtime|js runtime|\bejs\b|n challenge/i.test(stderr)) {
         hintShown = true;
         console.log('[ytdlp] YouTube butuh JavaScript runtime. Coba isi di .env: YTDLP_EXTRA_ARGS=--js-runtimes node');
@@ -125,13 +212,13 @@ function toError(stderr, code) {
 
 async function run(args, timeoutMs = 30_000) {
     if (!usable()) throw new Error("yt-dlp belum siap (unduhan gagal, dicoba lagi nanti)");
-    const bin = await ensureBinary();
+    const target = await ensureBinary();
     return new Promise((resolve, reject) => {
-        const proc = spawn(bin, [...baseArgs(), ...args], { stdio: ["ignore", "pipe", "pipe"] });
+        const proc = spawnYtdlp(target, [...baseArgs(), ...args]);
         let out = "";
         let err = "";
         const timer = setTimeout(() => {
-            proc.kill("SIGKILL");
+            killProc(proc);
             reject(new Error("yt-dlp timeout"));
         }, timeoutMs);
         proc.stdout.on("data", (d) => (out += d));
@@ -198,19 +285,15 @@ async function playlist(url, limit = 20) {
 // cleanup() mematikan proses yt-dlp; dipanggil musicPlayer.js saat lagu selesai/di-skip/stop.
 async function stream(url) {
     if (!usable()) throw new Error("yt-dlp belum siap (unduhan gagal, dicoba lagi nanti)");
-    const bin = await ensureBinary();
+    const target = await ensureBinary();
 
     const args = [...baseArgs(), "--no-playlist", "--quiet", "--no-progress", "-f", "bestaudio/best", "-o", "-", url];
-    const proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const proc = spawnYtdlp(target, args);
     const out = new PassThrough();
     let err = "";
 
     const cleanup = () => {
-        try {
-            proc.kill("SIGKILL");
-        } catch (e) {
-            // sudah mati
-        }
+        killProc(proc);
         try {
             out.destroy();
         } catch (e) {

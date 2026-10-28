@@ -2,42 +2,13 @@
 // Ubah input user (link YouTube / playlist / link SoundCloud / judul lagu) jadi daftar "song"
 // yang bisa dimainkan musicPlayer.js. Pakai library play-dl yang sudah terpasang di project.
 //
-// CATATAN: play-dl sudah tidak dirawat lagi oleh pembuatnya, dan YouTube sering menolak
-// koneksi dari server hosting (error 429 / "sign in to confirm you're not a bot").
-// Kalau sering gagal, lihat opsi YOUTUBE_COOKIE di bawah, atau pakai link SoundCloud.
+// Jalur UTAMA sekarang yt-dlp (lihat ytdlp.js). play-dl hanya cadangan kalau yt-dlp gagal,
+// karena play-dl sudah tidak dirawat dan sering kena error 429 dari YouTube di server hosting.
+// Kalau YouTube tetap menolak sama sekali, lagu otomatis dicoba dicari di SoundCloud.
 const play = require("play-dl");
+const ytdlp = require("./ytdlp");
 
-// ---------- PELINDUNG ERROR 429 ----------
-// Kalau YouTube membalas 429 (kebanyakan permintaan dari IP server) atau minta "sign in / not a bot",
-// semua permintaan ke YouTube dihentikan sementara. Terus memaksa cuma bikin blokirnya makin lama.
-const YOUTUBE_COOLDOWN_MS = Math.max(0, Number(process.env.YOUTUBE_COOLDOWN_MIN || 10)) * 60 * 1000;
-let youtubeBlockedUntil = 0;
-
-function isRateLimitError(err) {
-    return /429|too many requests|sign in to confirm|not a bot/i.test(String((err && err.message) || err));
-}
-
-async function yt(call) {
-    if (Date.now() < youtubeBlockedUntil) {
-        const minutes = Math.max(1, Math.ceil((youtubeBlockedUntil - Date.now()) / 60000));
-        throw new Error(
-            `YouTube lagi nge-blok server bot (error 429). Biar gak makin lama, bot istirahat dulu sekitar ${minutes} menit. Coba lagi nanti, atau pakai link SoundCloud.`
-        );
-    }
-    try {
-        return await call();
-    } catch (err) {
-        if (isRateLimitError(err)) {
-            if (Date.now() >= youtubeBlockedUntil) {
-                console.log(`[youtubeSource] YouTube menolak (429/anti-bot). Semua permintaan ke YouTube dijeda ${Math.round(YOUTUBE_COOLDOWN_MS / 60000)} menit.`);
-            }
-            youtubeBlockedUntil = Date.now() + YOUTUBE_COOLDOWN_MS;
-        }
-        throw err;
-    }
-}
-
-const MAX_PLAYLIST_SONGS = 20;
+const MAX_PLAYLIST_SONGS = 100;
 
 // Opsional: cookie YouTube (dari akun cadangan, JANGAN akun utama) kadang membantu kalau YouTube menolak.
 // Isi di .env: YOUTUBE_COOKIE=...  (risiko: akun itu bisa kena batasan dari YouTube)
@@ -60,18 +31,74 @@ function ensureSoundCloud() {
     return soundcloudReady;
 }
 
+// ---------- LAPISAN AKSES (yt-dlp dulu, play-dl cadangan) ----------
+const fmtDuration = (sec) => (sec ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}` : null);
+
+// Hasil seragam: [{ title, url, durationSec, channel }]
+async function searchYouTube(query, limit = 5) {
+    try {
+        const r = await ytdlp.search(query, limit);
+        if (r.length > 0) return r;
+    } catch (err) {
+        console.log("[youtubeSource] yt-dlp search gagal, coba play-dl:", err.message);
+    }
+    const r = await play.search(query, { limit, source: { youtube: "video" } });
+    return (r || []).map((v) => ({
+        title: v.title || "",
+        url: v.url,
+        durationSec: v.durationInSec || null,
+        channel: (v.channel && v.channel.name) || "",
+    }));
+}
+
+// Stream audio: yt-dlp dulu, play-dl kalau gagal. Hasil: { stream, type, cleanup? }
+async function openStream(url) {
+    let ytErr;
+    try {
+        return await ytdlp.stream(url);
+    } catch (err) {
+        ytErr = err;
+        console.log("[youtubeSource] yt-dlp stream gagal, coba play-dl:", err.message);
+    }
+    try {
+        const s = await play.stream(url);
+        return { stream: s.stream, type: s.type };
+    } catch (err) {
+        // Laporkan alasan dari yt-dlp (lebih informatif daripada "429" dari play-dl)
+        throw new Error(ytErr ? ytErr.message : err.message);
+    }
+}
+
+// Cadangan terakhir: cari judul yang sama di SoundCloud
+async function soundcloudFallback(query) {
+    await ensureSoundCloud();
+    const r = await play.search(query, { limit: 1, source: { soundcloud: "tracks" } });
+    if (!r || r.length === 0) throw new Error(`Gak nemu "${query}" di SoundCloud juga.`);
+    const s = await play.stream(r[0].url);
+    return { stream: s.stream, type: s.type };
+}
+
 // Bikin objek lagu. Stream baru diambil saat lagu mau diputar (getStream), bukan saat ditambah ke antrian.
-function makeSong({ title, url, duration }, requestedBy) {
+// fallbackQuery (opsional): kalau stream YouTube gagal, judul ini dicari di SoundCloud.
+function makeSong({ title, url, duration, fallbackQuery }, requestedBy) {
     return {
         title: title || url,
         url,
-        resolvedUrl: url, // URL video YouTube yang benar-benar diputar (dipakai autoplay)
         duration: duration || null,
         source: url,
         requestedBy,
         getStream: async () => {
-            const s = /youtu\.?be/i.test(url) ? await yt(() => play.stream(url)) : await play.stream(url);
-            return { stream: s.stream, type: s.type };
+            try {
+                return await openStream(url);
+            } catch (err) {
+                if (!fallbackQuery) throw err;
+                console.log(`[youtubeSource] YouTube gagal (${err.message}), coba SoundCloud buat "${fallbackQuery}"...`);
+                try {
+                    return await soundcloudFallback(fallbackQuery);
+                } catch (scErr) {
+                    throw err; // tampilkan alasan asli dari YouTube
+                }
+            }
         },
     };
 }
@@ -82,8 +109,8 @@ function makeSong({ title, url, duration }, requestedBy) {
 // Metadata dibaca dari halaman embed publik Spotify (tanpa API key). Ini cara tidak resmi,
 // jadi bisa berhenti jalan kalau Spotify mengubah halamannya.
 // (API resmi Spotify sejak Februari 2026 mensyaratkan akun Premium untuk pemilik app, jadi dihindari.)
-const SPOTIFY_URL = /open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|artist)\/([A-Za-z0-9]+)/i;
-const SPOTIFY_URI = /^spotify:(track|album|playlist|artist):([A-Za-z0-9]+)$/i;
+const SPOTIFY_URL = /open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist)\/([A-Za-z0-9]+)/i;
+const SPOTIFY_URI = /^spotify:(track|album|playlist):([A-Za-z0-9]+)$/i;
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 function parseSpotify(text) {
@@ -152,7 +179,7 @@ async function spotifyOEmbedTitle(url) {
 const BAD_WORDS = ["cover", "live", "remix", "karaoke", "slowed", "sped up", "reverb", "nightcore", "8d", "instrumental", "akustik", "acoustic", "reaction"];
 
 async function findBestYouTube(query, rawQuery = query) {
-    const results = await yt(() => play.search(query, { limit: 5, source: { youtube: "video" } }));
+    const results = await searchYouTube(query, 5);
     if (!results || results.length === 0) return null;
 
     const wanted = String(rawQuery).toLowerCase();
@@ -161,7 +188,7 @@ async function findBestYouTube(query, rawQuery = query) {
 
     results.forEach((v, i) => {
         const title = String(v.title || "").toLowerCase();
-        const channel = String((v.channel && v.channel.name) || "").toLowerCase();
+        const channel = String(v.channel || "").toLowerCase();
         let score = -i * 0.5; // urutan asli dari YouTube tetap dihargai
 
         if (/ - topic$/.test(channel)) score += 3;
@@ -169,7 +196,7 @@ async function findBestYouTube(query, rawQuery = query) {
         for (const bad of BAD_WORDS) {
             if (new RegExp(`\\b${bad}\\b`, "i").test(title) && !wanted.includes(bad)) score -= 3;
         }
-        if (v.durationInSec && v.durationInSec > 15 * 60) score -= 3; // kemungkinan kompilasi/mix panjang
+        if (v.durationSec && v.durationSec > 15 * 60) score -= 3; // kemungkinan kompilasi/mix panjang
 
         if (score > bestScore) {
             best = v;
@@ -224,26 +251,30 @@ async function spotifySearch(text) {
 function makeLazySearchSong({ title, artist, url, duration }, requestedBy) {
     const q = artist ? `${artist} - ${title}` : title;
     let cachedUrl = null;
-    const song = {
+    return {
         title: q,
-        artist: artist || "",
         url,
-        resolvedUrl: null,
         duration: duration || null,
         source: url,
         requestedBy,
         getStream: async () => {
-            if (!cachedUrl) {
-                const best = await findBestYouTube(q);
-                if (!best) throw new Error(`Gak nemu "${q}" di YouTube.`);
-                cachedUrl = best.url;
+            try {
+                if (!cachedUrl) {
+                    const best = await findBestYouTube(q);
+                    if (!best) throw new Error(`Gak nemu "${q}" di YouTube.`);
+                    cachedUrl = best.url;
+                }
+                return await openStream(cachedUrl);
+            } catch (err) {
+                console.log(`[youtubeSource] YouTube gagal buat "${q}" (${err.message}), coba SoundCloud...`);
+                try {
+                    return await soundcloudFallback(q);
+                } catch (scErr) {
+                    throw err; // tampilkan alasan asli dari YouTube
+                }
             }
-            song.resolvedUrl = cachedUrl;
-            const s = await yt(() => play.stream(cachedUrl));
-            return { stream: s.stream, type: s.type };
         },
     };
-    return song;
 }
 
 async function resolveSpotify({ type, id }, originalUrl, requestedBy) {
@@ -272,7 +303,7 @@ async function resolveSpotify({ type, id }, originalUrl, requestedBy) {
     if (type === "track") return { songs: songs.slice(0, 1) };
     return {
         songs,
-        note: `${type === "album" ? "Album" : type === "artist" ? "Top tracks artis" : "Playlist"} Spotify **${info.name || "tanpa judul"}** (maks ${MAX_PLAYLIST_SONGS} lagu pertama)`,
+        note: `${type === "album" ? "Album" : "Playlist"} Spotify **${info.name || "tanpa judul"}** (maks ${MAX_PLAYLIST_SONGS} lagu pertama)`,
     };
 }
 
@@ -283,31 +314,57 @@ async function resolveQuery(query, requestedBy) {
     const sp = parseSpotify(text);
     if (sp) return resolveSpotify(sp, text, requestedBy);
     if (/open\.spotify\.com\//i.test(text)) {
-        throw new Error("Link Spotify itu belum didukung. Pakai link lagu (track), album, playlist, atau artis.");
+        throw new Error("Link Spotify itu belum didukung. Pakai link lagu (track), album, atau playlist.");
     }
 
     if (/^https?:\/\//i.test(text)) {
         const yt = play.yt_validate(text);
 
         if (yt === "video") {
-            const info = await yt(() => play.video_basic_info(text));
-            const d = info.video_details;
-            return { songs: [makeSong({ title: d.title, url: d.url || text, duration: d.durationRaw }, requestedBy)] };
+            let title = null;
+            let duration = null;
+            try {
+                const i = await ytdlp.info(text);
+                if (i) {
+                    title = i.title;
+                    duration = fmtDuration(i.durationSec);
+                }
+            } catch (err) {
+                try {
+                    const d = (await play.video_basic_info(text)).video_details;
+                    title = d.title;
+                    duration = d.durationRaw;
+                } catch (err2) {
+                    // info gagal diambil: tetap coba putar langsung, judul pakai link
+                }
+            }
+            return { songs: [makeSong({ title, url: text, duration }, requestedBy)] };
         }
 
         if (yt === "playlist") {
-            const pl = await yt(() => play.playlist_info(text, { incomplete: true }));
+            let plTitle = "";
             let vids = [];
             try {
-                vids = typeof pl.page === "function" ? await pl.page(1) : pl.videos;
+                const pl = await ytdlp.playlist(text, MAX_PLAYLIST_SONGS);
+                plTitle = pl.title;
+                vids = pl.entries.map((v) => ({ title: v.title, url: v.url, duration: fmtDuration(v.durationSec) }));
             } catch (err) {
-                vids = pl.videos || [];
+                console.log("[youtubeSource] yt-dlp playlist gagal, coba play-dl:", err.message);
+                const pl = await play.playlist_info(text, { incomplete: true });
+                plTitle = pl.title;
+                let raw = [];
+                try {
+                    raw = typeof pl.page === "function" ? await pl.page(1) : pl.videos;
+                } catch (e) {
+                    raw = pl.videos || [];
+                }
+                vids = (raw || []).map((v) => ({ title: v.title, url: v.url, duration: v.durationRaw }));
             }
-            vids = (vids || []).slice(0, MAX_PLAYLIST_SONGS);
+            vids = vids.slice(0, MAX_PLAYLIST_SONGS);
             if (vids.length === 0) throw new Error("Playlist kosong atau gak bisa dibaca.");
             return {
-                songs: vids.map((v) => makeSong({ title: v.title, url: v.url, duration: v.durationRaw }, requestedBy)),
-                note: `Playlist **${pl.title || "tanpa judul"}** (maks ${MAX_PLAYLIST_SONGS} lagu pertama)`,
+                songs: vids.map((v) => makeSong(v, requestedBy)),
+                note: `Playlist **${plTitle || "tanpa judul"}** (maks ${MAX_PLAYLIST_SONGS} lagu pertama)`,
             };
         }
 
@@ -340,84 +397,18 @@ async function resolveQuery(query, requestedBy) {
     }
 
     const q = canonical && canonical.title ? (canonical.artist ? `${canonical.artist} - ${canonical.title}` : canonical.title) : text;
-    const best = await findBestYouTube(q, text);
+    let best;
+    try {
+        best = await findBestYouTube(q, text);
+    } catch (err) {
+        // Pencarian YouTube diblokir: serahkan ke pencarian "malas" (YouTube lagi, lalu SoundCloud) saat lagu diputar
+        console.log("[youtubeSource] Pencarian YouTube gagal:", err.message);
+        return { songs: [makeLazySearchSong({ title: q, artist: "", url: null }, requestedBy)] };
+    }
     if (!best) throw new Error(`Gak nemu hasil buat "${text}".`);
     return {
-        songs: [makeSong({ title: canonical ? q : best.title, url: best.url, duration: best.durationRaw }, requestedBy)],
+        songs: [makeSong({ title: canonical ? q : best.title, url: best.url, duration: fmtDuration(best.durationSec), fallbackQuery: q }, requestedBy)],
     };
 }
 
-// ---------- AUTOPLAY: cari lagu lanjutan ----------
-function videoIdOf(u) {
-    try {
-        const x = new URL(u);
-        if (x.hostname.includes("youtu.be")) return x.pathname.slice(1);
-        return x.searchParams.get("v") || String(u);
-    } catch (err) {
-        return String(u);
-    }
-}
-
-const COMPILATION = /\b(full album|non ?stop|kompilasi|compilation|playlist|\d+\s*(jam|hours?|hrs?))\b/i;
-
-// Layak jadi lagu autoplay? (bukan live, durasi wajar, bukan cover/remix/kompilasi, belum pernah diputar)
-function okCandidate(d, seen, basisTitle) {
-    if (!d) return false;
-    const id = d.id || videoIdOf(d.url);
-    if (seen.has(id)) return false;
-    if (d.live) return false;
-    const dur = d.durationInSec;
-    if (dur && (dur < 60 || dur > 12 * 60)) return false;
-
-    const title = String(d.title || "").toLowerCase();
-    const base = String(basisTitle || "").toLowerCase();
-    if (COMPILATION.test(title)) return false;
-    for (const bad of BAD_WORDS) {
-        if (new RegExp(`\\b${bad}\\b`, "i").test(title) && !base.includes(bad)) return false;
-    }
-    return true;
-}
-
-// Ambil 1 lagu lanjutan dari lagu "basis":
-//  1) pakai daftar video terkait dari YouTube (maks 6 yang dicek),
-//  2) kalau gagal, cari lagu lain dari artis / channel yang sama.
-async function findRelatedSong(basis, history, requestedBy) {
-    const seen = new Set((history || []).map(videoIdOf));
-    const baseUrl = basis.resolvedUrl || basis.url;
-    if (baseUrl) seen.add(videoIdOf(baseUrl));
-    let channelName = "";
-
-    try {
-        const info = await yt(() => play.video_basic_info(baseUrl));
-        channelName = (info.video_details && info.video_details.channel && info.video_details.channel.name) || "";
-        let checked = 0;
-        for (const u of info.related_videos || []) {
-            if (checked >= 4) break; // sedikit-sedikit saja, biar gak memicu 429
-            if (seen.has(videoIdOf(u))) continue;
-            checked++;
-            try {
-                const d = (await yt(() => play.video_basic_info(u))).video_details;
-                if (okCandidate(d, seen, basis.title)) {
-                    return makeSong({ title: d.title, url: d.url || u, duration: d.durationRaw }, requestedBy);
-                }
-            } catch (err) {
-                // video ini gak bisa dibaca, coba berikutnya
-            }
-        }
-    } catch (err) {
-        // gak bisa ambil daftar video terkait, lanjut ke cadangan
-    }
-
-    const artist = basis.artist || channelName.replace(/ - topic$/i, "").trim();
-    if (artist) {
-        const results = await yt(() => play.search(artist, { limit: 10, source: { youtube: "video" } }));
-        for (const v of results || []) {
-            if (okCandidate(v, seen, basis.title)) {
-                return makeSong({ title: v.title, url: v.url, duration: v.durationRaw }, requestedBy);
-            }
-        }
-    }
-    return null;
-}
-
-module.exports = { resolveQuery, makeSong, findRelatedSong };
+module.exports = { resolveQuery, makeSong };
