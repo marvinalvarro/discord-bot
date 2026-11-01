@@ -5,11 +5,15 @@
 const ALLOWED_USER_IDS = ["1015666814325375067"]; // founder
 
 const ANNOUNCEMENT =
-    "@everyone\n" +
-    "📢 **Bot Musik Game Verse sudah hadir!** 🎶 " +
-    "Masuk ke voice channel, ketik `2p judul lagu` atau tempel link **YouTube/Spotify**, " +
-    "dan salah satu dari 3 bot musik akan otomatis datang. " +
-    "Skip pakai `2s`, selesai pakai `2stop`, dan `2help` buat daftar perintah lengkap. 🎧";
+    "@Partnership\n" +
+    "📢 **PARTNERSHIP NOTICE**\n\n" +
+    "Seluruh partner diwajibkan menjaga komunikasi dan keaktifan. " +
+    "Kontribusi tidak harus besar, sekadar chat atau saling menyapa sudah cukup.\n\n" +
+    "**BATAS MAKSIMAL TIDAK AKTIF: 7 HARI (168 JAM).**\n" +
+    "Jika tidak ada aktivitas sama sekali selama 7 hari berturut-turut sejak interaksi terakhir, " +
+    "partnership akan **LANGSUNG DIPUTUS** tanpa toleransi dan tanpa pemberitahuan ulang.\n\n" +
+    "Kami tidak mengejar jumlah partner, tetapi kualitas dan keaktifan kerja sama.\n" +
+    "Harap diperhatikan. Tidak ada pengecualian.";
 
 module.exports = {
     name: "umumkanmusik",
