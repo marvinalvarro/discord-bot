@@ -1,19 +1,17 @@
 // commands/umumkanmusik.js
-// Kirim pengumuman bot musik lewat bot (Nova Verse). Khusus founder.
+// Kirim pengumuman lewat bot (Nova Verse). Khusus founder.
 // Pakai: .umumkanmusik            -> kirim di channel tempat kamu mengetik
 //        .umumkanmusik #channel   -> kirim ke channel yang di-mention
 const ALLOWED_USER_IDS = ["1015666814325375067"]; // founder
 
 const ANNOUNCEMENT =
-    "@Partnership\n" +
-    "📢 **PARTNERSHIP NOTICE**\n\n" +
-    "Seluruh partner diwajibkan menjaga komunikasi dan keaktifan. " +
-    "Kontribusi tidak harus besar, sekadar chat atau saling menyapa sudah cukup.\n\n" +
-    "**BATAS MAKSIMAL TIDAK AKTIF: 7 HARI (168 JAM).**\n" +
-    "Jika tidak ada aktivitas sama sekali selama 7 hari berturut-turut sejak interaksi terakhir, " +
-    "partnership akan **LANGSUNG DIPUTUS** tanpa toleransi dan tanpa pemberitahuan ulang.\n\n" +
-    "Kami tidak mengejar jumlah partner, tetapi kualitas dan keaktifan kerja sama.\n" +
-    "Harap diperhatikan. Tidak ada pengecualian.";
+    "@everyone\n" +
+    "📢 **Fitur AFK sudah hadir!** 💤\n\n" +
+    "Mau pergi sebentar tanpa ditunggu-tunggu? Ketik `.afk <alasan>`, contoh: `.afk makan`.\n\n" +
+    "• Kalau ada yang nge-tag kamu, bot langsung kasih tau kalau kamu lagi AFK beserta alasannya.\n" +
+    "• Nickname kamu otomatis jadi `[ AFK ] Makan NamaKamu`.\n" +
+    "• Pas kamu chat lagi, AFK otomatis dicabut dan nickname balik seperti semula. 👋\n\n" +
+    "Bisa dipakai di semua channel, coba sekarang! 🚀";
 
 module.exports = {
     name: "umumkanmusik",
