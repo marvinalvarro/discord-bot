@@ -8,6 +8,7 @@ const { handleDonationMessage } = require("../donationTracker");
 const { loadData, saveData } = require("../activityTracker");
 const { handleFriendStreakMessage } = require("../friendStreakTracker");
 const { handleRemoveBgMessage } = require("../removeBgChannel");
+const { handleMessage: handleAfk } = require("../afkSystem");
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -210,6 +211,14 @@ module.exports = {
                 return;
             }
         }
+
+        // ===============================
+        // AFK (cabut AFK kalau yang chat lagi AFK, dan kasih tau kalau ada yang tag orang AFK)
+        // Ditaruh setelah auto-ban: pesan yang kena ban gak perlu diproses AFK.
+        // ===============================
+        handleAfk(message).catch((err) => {
+            console.error("[afk] Error:", err);
+        });
 
         // ===============================
         // XP CHAT
