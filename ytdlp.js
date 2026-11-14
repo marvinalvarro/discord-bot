@@ -88,6 +88,8 @@ try {
 
 let failedAt = 0; // waktu terakhir yt-dlp gagal disiapkan; selama masa tunggu, jalur ini dilewati
 let hintShown = false;
+let signInHintShown = false;
+let cookiesInvalidShown = false;
 
 function assetName() {
     if (IS_WIN) return "yt-dlp.exe";
@@ -184,13 +186,38 @@ function usable() {
     return Date.now() - failedAt > RETRY_AFTER_FAIL_MS;
 }
 
-function baseArgs() {
-    const args = ["--ignore-config", "--no-warnings", "--socket-timeout", "15", "--retries", "2"];
-    if (ffmpegPath) args.push("--ffmpeg-location", ffmpegPath);
-    if (process.env.YTDLP_COOKIES) {
-        const cookies = path.resolve(__dirname, process.env.YTDLP_COOKIES);
-        if (fs.existsSync(cookies)) args.push("--cookies", cookies);
+// Status cookies dicatat sekali di console, supaya kelihatan kalau cookies ternyata gak terpakai.
+let cookiesState = null; // { used: bool, ageDays: number|null }
+function cookiesArgs() {
+    const name = process.env.YTDLP_COOKIES;
+    let state;
+    let result = [];
+    if (!name) {
+        state = { used: false, ageDays: null, why: "YTDLP_COOKIES belum diisi di .env" };
+    } else {
+        const file = path.resolve(__dirname, name);
+        if (!fs.existsSync(file)) {
+            state = { used: false, ageDays: null, why: `file cookies gak ketemu: ${file}` };
+        } else {
+            state = { used: true, ageDays: null };
+            result = ["--cookies", file];
+        }
     }
+    if (!cookiesState) {
+        console.log(
+            state.used
+                ? `[ytdlp] Pakai cookies: ${name}`
+                : `[ytdlp] Jalan TANPA cookies (${state.why}).`
+        );
+    }
+    cookiesState = state;
+    return result;
+}
+
+function baseArgs() {
+    const args = ["--ignore-config", "--socket-timeout", "15", "--retries", "2"];
+    if (ffmpegPath) args.push("--ffmpeg-location", ffmpegPath);
+    args.push(...cookiesArgs());
     if (process.env.YTDLP_EXTRA_ARGS) args.push(...process.env.YTDLP_EXTRA_ARGS.split(/\s+/).filter(Boolean));
     return args;
 }
@@ -202,6 +229,22 @@ function toError(stderr, code) {
     const msg = errLine.replace(/^ERROR:\s*/i, "").slice(0, 300);
     if (/Failed to extract entry|PYI-\d+/i.test(stderr)) {
         console.log("[ytdlp] yt-dlp standalone gagal mengekstrak (temp/disk penuh). Pasang Python 3.10+ atau kosongkan disk; hapus folder bin/ lalu restart.");
+    }
+    if (!cookiesInvalidShown && /cookies are no longer valid|rotated in the browser/i.test(stderr)) {
+        cookiesInvalidShown = true;
+        console.log(
+            "[ytdlp] YouTube bilang COOKIES SUDAH TIDAK VALID (dirotasi). Ekspor ulang cookies.txt dari jendela private yang baru (login, buka youtube.com/robots.txt, Export, lalu tutup jendelanya) dan upload lagi."
+        );
+    }
+    if (!signInHintShown && /sign in to confirm|not a bot/i.test(stderr)) {
+        signInHintShown = true;
+        if (!cookiesState || !cookiesState.used) {
+            console.log("[ytdlp] YouTube minta login dan cookies TIDAK terpakai. Cek YTDLP_COOKIES di .env dan file cookies.txt di root bot.");
+        } else {
+            console.log(
+                "[ytdlp] YouTube tetap minta login walau cookies dipakai. Kalau gak ada pesan 'COOKIES SUDAH TIDAK VALID' di atas, cookies-nya terbaca sah dan penyebab paling mungkin IP hosting yang ditandai YouTube."
+            );
+        }
     }
     if (!hintShown && /javascript runtime|js runtime|\bejs\b|n challenge/i.test(stderr)) {
         hintShown = true;
