@@ -6,6 +6,7 @@ const { initInviteCache } = require("../inviteTracker");
 const { startActivityTickLoop } = require("../activityTracker");
 const { startYoutubeLiveLoop } = require("../youtubeLiveTracker");
 const { startTiktokLiveLoop } = require("../tiktokLiveTracker");
+const { setupAutoPlay } = require("../autoPlay");
 
 // ID channel trap, HARUS SAMA PERSIS dengan TRAP_CHANNEL_ID di events/messageCreate.js
 const TRAP_CHANNEL_ID = "1532607922431987805";
@@ -45,6 +46,9 @@ module.exports = {
 
         // Notif otomatis + role live kalau akun TikTok yang dipantau lagi live
         startTiktokLiveLoop(client);
+
+        // Auto-join voice + muter semua lagu folder music/ saat bot menyala (isi NOVA_AUTOPLAY_CHANNEL_ID di .env)
+        setupAutoPlay(client, { envKey: "NOVA_AUTOPLAY_CHANNEL_ID", name: "Nova Verse" });
 
         function getJakartaHour() {
             const jakartaTimeStr = new Date().toLocaleString("en-US", {

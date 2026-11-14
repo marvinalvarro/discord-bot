@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { Events } = require("discord.js");
 const { getQueue, connectToVoice, resolveSong, LOCAL_MUSIC_DIR } = require("./musicPlayer");
+const { setupAutoPlay } = require("./autoPlay");
 
 const NS = "platform";
 const PREFIX = process.env.PLATFORM_PREFIX || ",";
@@ -232,6 +233,9 @@ const aliases = { p: "play", s: "skip", q: "queue", vol: "volume", leave: "stop"
 function registerPlatformMusic(client) {
     // Tandai client ini supaya musicPlayer.js memakai antrian & koneksi voice terpisah dari Nova Verse
     client.musicNamespace = NS;
+
+    // Auto-join voice + muter semua lagu folder music/ saat bot menyala (isi PLATFORM_AUTOPLAY_CHANNEL_ID di .env)
+    setupAutoPlay(client, { envKey: "PLATFORM_AUTOPLAY_CHANNEL_ID", name: "GV Platform" });
 
     client.on(Events.MessageCreate, async (message) => {
         if (message.author.bot || !message.guild) return;
