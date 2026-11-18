@@ -2,12 +2,14 @@
 // Kick banyak orang sekaligus lewat ID. Khusus founder / yang punya izin Kick Members.
 // Pakai: .kickmassal 111111111111111111 222222222222222222 333333333333333333 | alasan (opsional)
 //        ID dipisah spasi / koma / baris baru. Maksimal 50 ID sekali jalan.
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 
 const ALLOWED_USER_IDS = ["1015666814325375067"]; // founder (selalu boleh)
 const MAX_IDS = 50;
 const DELAY_MS = 1200; // jeda antar kick biar aman dari rate limit
 const CONFIRM_MS = 30_000;
+// Channel notif kick. Isi BANNED_CHANNEL_ID di .env, kalau kosong dicari channel yang namanya mengandung "banned".
+const LOG_CHANNEL_ID = process.env.BANNED_CHANNEL_ID || "";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -92,12 +94,27 @@ module.exports = {
         }
         await click.update({ content: `⏳ Mengkick ${ok.length} orang...`, components: [] }).catch(() => {});
 
+        const logChannel = LOG_CHANNEL_ID
+            ? await message.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null)
+            : message.guild.channels.cache.find((c) => c.isTextBased() && c.name.toLowerCase().includes("banned"));
+
         const done = [];
         const failed = [];
         for (const m of ok) {
             try {
                 await m.kick(`${reason} (oleh ${message.author.tag})`);
                 done.push(m);
+                if (logChannel) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0xe74c3c)
+                        .setDescription(
+                            `**${m.user.username} was kicked!**\n\n**Reason:** ${reason}\n\n<@${m.id}> telah dikeluarkan dari ${message.guild.name}.`
+                        )
+                        .setThumbnail(m.user.displayAvatarURL({ size: 256 }))
+                        .setFooter({ text: `ID: ${m.id}` })
+                        .setTimestamp();
+                    logChannel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+                }
             } catch (err) {
                 failed.push([m, err.message]);
             }
