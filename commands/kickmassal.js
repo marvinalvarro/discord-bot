@@ -2,7 +2,8 @@
 // Kick banyak orang sekaligus lewat ID. Khusus founder / yang punya izin Kick Members.
 // Pakai: .kickmassal 111111111111111111 222222222222222222 333333333333333333 | alasan (opsional)
 //        ID dipisah spasi / koma / baris baru. Maksimal 50 ID sekali jalan.
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, EmbedBuilder, PermissionFlagsBits } = require("discord.js");
+const { generateBannedCard } = require("../bannedCardGenerator");
 
 const ALLOWED_USER_IDS = ["1015666814325375067"]; // founder (selalu boleh)
 const MAX_IDS = 50;
@@ -107,13 +108,22 @@ module.exports = {
                 if (logChannel) {
                     const embed = new EmbedBuilder()
                         .setColor(0xe74c3c)
-                        .setDescription(
-                            `**${m.user.username} was kicked!**\n\n**Reason:** ${reason}\n\n<@${m.id}> telah dikeluarkan dari ${message.guild.name}.`
-                        )
-                        .setThumbnail(m.user.displayAvatarURL({ size: 256 }))
-                        .setFooter({ text: `ID: ${m.id}` })
+                        .setAuthor({
+                            name: `${m.user.tag} was kicked!`,
+                            iconUrl: client.user.displayAvatarURL(),
+                        })
+                        .setDescription(`**Reason:** ${reason}\n\n${m.user} telah dikeluarkan dari ${message.guild.name}.`)
                         .setTimestamp();
-                    logChannel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+                    try {
+                        const img = await generateBannedCard(m.user, "KICKED");
+                        const file = new AttachmentBuilder(img, { name: "kicked.png" });
+                        embed.setImage("attachment://kicked.png");
+                        await logChannel.send({ embeds: [embed], files: [file], allowedMentions: { parse: [] } });
+                    } catch (genErr) {
+                        console.error("[kickmassal] Gagal bikin banner, fallback avatar:", genErr.message);
+                        embed.setImage(m.user.displayAvatarURL({ extension: "png", size: 1024 }));
+                        await logChannel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+                    }
                 }
             } catch (err) {
                 failed.push([m, err.message]);

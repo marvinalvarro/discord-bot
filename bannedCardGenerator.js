@@ -21,7 +21,8 @@ safeRegisterFont("ChakraPetch-Bold.ttf", "ChakraPetch-Bold");
 const WIDTH = 900;
 const HEIGHT = 500;
 
-async function generateBannedCard(user) {
+// label: tulisan stempel di tengah. Default "BANNED" (dipakai notif ban), "KICKED" dipakai kickmassal.
+async function generateBannedCard(user, label = "BANNED") {
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext("2d");
 
@@ -68,7 +69,7 @@ async function generateBannedCard(user) {
     ctx.arc(avatarX, avatarY, smallAvatarSize / 2, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Teks "BANNED" diagonal gede, kayak stempel
+    // Teks stempel diagonal gede ("BANNED" / "KICKED")
     ctx.save();
     ctx.translate(WIDTH / 2 + 70, HEIGHT / 2 - 10);
     ctx.rotate(-0.12);
@@ -76,12 +77,12 @@ async function generateBannedCard(user) {
     ctx.font = "bold 110px Bevan-Regular";
     ctx.strokeStyle = "#000000";
     ctx.lineWidth = 8;
-    ctx.strokeText("BANNED", 0, 0);
+    ctx.strokeText(label, 0, 0);
     ctx.fillStyle = "#E74C3C";
-    ctx.fillText("BANNED", 0, 0);
+    ctx.fillText(label, 0, 0);
     ctx.restore();
 
-    // Username di bawah teks BANNED
+    // Username di bawah teks stempel
     ctx.textAlign = "center";
     ctx.font = "bold 34px ChakraPetch-Bold";
     ctx.fillStyle = "#ffffff";
